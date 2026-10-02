@@ -1,0 +1,144 @@
+%============================= app1.tex================================
+\chapter{Kinematic Preliminaries: Forward Kinematics and Rotation Representations}
+\label{app:kinematics}
+
+Chapters~\ref{chap:vision_pipelines} through~\ref{chap:learned_control} all reason about robot pose
+through the same forward-kinematics chain and about orientation error through two representations,
+unit quaternions in Chapter~\ref{chap:shared_vision} (Equations~\eqref{eq:sv_eo}
+and~\eqref{eq:sv_thetae}) and rotation matrices in Chapter~\ref{chap:iapf}
+(Equations~\eqref{eq:iapf_orierror} and~\eqref{eq:iapf_angular}), without deriving either from first
+principles or showing that the two are the same geometric quantity. This appendix supplies both
+derivations.
+
+%% ============================================================
+\section{The Denavit--Hartenberg Transform and the Forward-Kinematics Chain}\label{sec:appA_dh}
+%% ============================================================
+
+Each single-joint transform $T^{k-1}_{k}(q_k)$ used in Equation~\eqref{eq:sv_fwdkin} and
+Equation~\eqref{eq:dm_jointpos} is the standard Denavit--Hartenberg (DH) homogeneous transform
+built from four elementary motions: a rotation about the $z_{k-1}$ axis by $\theta_k$, a translation
+along $z_{k-1}$ by $d_k$, a translation along the new $x_k$ axis by $a_k$, and a rotation about
+$x_k$ by $\alpha_k$,
+\begin{equation}
+T^{k-1}_{k} = \operatorname{Rot}_z(\theta_k)\,\operatorname{Trans}_z(d_k)\,
+\operatorname{Trans}_x(a_k)\,\operatorname{Rot}_x(\alpha_k).
+\label{eq:appA_dhfactors}
+\end{equation}
+Writing out the four elementary $4\times4$ matrices and multiplying gives the closed form
+\begin{equation}
+T^{k-1}_{k} =
+\begin{bmatrix}
+\cos\theta_k & -\sin\theta_k\cos\alpha_k & \sin\theta_k\sin\alpha_k & a_k\cos\theta_k \\
+\sin\theta_k & \cos\theta_k\cos\alpha_k & -\cos\theta_k\sin\alpha_k & a_k\sin\theta_k \\
+0 & \sin\alpha_k & \cos\alpha_k & d_k \\
+0 & 0 & 0 & 1
+\end{bmatrix},
+\label{eq:appA_dhmatrix}
+\end{equation}
+with $(\alpha_k, a_k, d_k, \theta_k)$ read directly from Table~\ref{tab:dm_dh} for each of the
+Kinova Gen3 Lite's six joints; the table's $\theta$ column already writes $\theta_k$ as the joint
+variable $q_k$ plus a fixed mechanical offset (for example $\theta_2 = q_2 + \pi/2$), so
+Equation~\eqref{eq:appA_dhmatrix} is a function of $q_k$ alone once that offset is substituted, with
+$\alpha_k$, $a_k$, $d_k$ fixed constants.
+
+Equation~\eqref{eq:sv_fwdkin} chains six such matrices, $T^{B}_{6}(\mathbf{q}) = T^{B}_{1}(q_1)\,
+T^{1}_{2}(q_2) \cdots T^{5}_{6}(q_6)$, one factor per joint. Because each factor is a rigid
+transform, the product is itself a rigid transform expressing the end-effector frame in the base
+frame for any joint configuration $\mathbf{q}$. The position of an intermediate joint $k$, rather
+than the end effector, is obtained by truncating the chain at $k$ and extracting its translation
+column: writing $T^{B}_{k}(\mathbf{q}) = \left[\begin{smallmatrix} R^{B}_{k} & \mathbf{p}^{B}_{k} \\
+\mathbf{0}^\top & 1\end{smallmatrix}\right]$, right-multiplying by the homogeneous origin
+$[0,0,0,1]^\top$ annihilates the rotation block and returns exactly the translation column,
+\begin{equation}
+T^{B}_{k}(\mathbf{q})\,[0,0,0,1]^\top = \left[\, R^{B}_{k}\cdot\mathbf{0} + \mathbf{p}^{B}_{k},\;\; 1
+\,\right]^\top = [\mathbf{p}^{B}_{k},\; 1]^\top,
+\label{eq:appA_originextract}
+\end{equation}
+which is precisely Equation~\eqref{eq:dm_jointpos}'s construction of $\mathbf{p}_i^k$, the joint
+positions used to build each link's line-segment endpoints in Equation~\eqref{eq:dm_segment}.
+
+%% ============================================================
+\section{Rotation Error: Quaternion and Axis-Angle Forms are the Same Object}\label{sec:appA_rot}
+%% ============================================================
+
+A rotation by angle $\theta$ about a unit axis $\hat{\mathbf{n}}$ has two standard representations.
+As a rotation matrix, Rodrigues' formula gives
+\begin{equation}
+R(\theta, \hat{\mathbf{n}}) = I + \sin\theta\,[\hat{\mathbf{n}}]_\times + (1-\cos\theta)\,[\hat{\mathbf{n}}]_\times^2,
+\qquad
+[\hat{\mathbf{n}}]_\times = \begin{bmatrix} 0 & -n_z & n_y \\ n_z & 0 & -n_x \\ -n_y & n_x & 0 \end{bmatrix}.
+\label{eq:appA_rodrigues}
+\end{equation}
+As a unit quaternion, the same rotation is $\mathbf{Q} = \left( \hat{\mathbf{n}}\sin(\theta/2),\;
+\cos(\theta/2) \right) \in \mathbb{R}^4$, vector part first and scalar part last, matching the
+convention $Q^{(4)}$ used for the scalar component in Equation~\eqref{eq:sv_thetae}. Composition of
+two rotations corresponds to quaternion (Hamilton) multiplication: for $\mathbf{Q}_1 = (\mathbf{v}_1,
+s_1)$ and $\mathbf{Q}_2 = (\mathbf{v}_2, s_2)$,
+\begin{equation}
+\mathbf{Q}_1 \otimes \mathbf{Q}_2 = \left( s_1\mathbf{v}_2 + s_2\mathbf{v}_1 + \mathbf{v}_1\times\mathbf{v}_2,\;\;
+s_1 s_2 - \mathbf{v}_1 \cdot \mathbf{v}_2 \right),
+\label{eq:appA_quatmul}
+\end{equation}
+and the inverse of a unit quaternion $\mathbf{Q}=(\mathbf{v},s)$ is its conjugate, $\mathbf{Q}^{-1} =
+(-\mathbf{v}, s)$.
+
+\textbf{Deriving Equations~\eqref{eq:sv_eo} and~\eqref{eq:sv_thetae}.} Let $\mathbf{Q}_{\text{curr}}$
+and $\mathbf{Q}_{\text{tgt}}$ represent the current and target orientations, $R_{\text{curr}}$ and
+$R_{\text{tgt}}$. The relative rotation that must be applied to the current orientation to reach the
+target, $R_e$ such that $R_e R_{\text{curr}} = R_{\text{tgt}}$, is represented by the quaternion
+product $\mathbf{Q}_e = \mathbf{Q}_{\text{tgt}} \otimes \mathbf{Q}_{\text{curr}}^{-1}$, exactly
+Equation~\eqref{eq:sv_quaterr}. Writing $\mathbf{Q}_e = (\mathbf{v}_e, s_e)$, unit-quaternion algebra
+guarantees $\mathbf{Q}_e$ is itself a unit quaternion representing some rotation angle $\theta_e$
+about some axis $\hat{\mathbf{k}}$, so by the parametrization above $\mathbf{v}_e = \hat{\mathbf{k}}
+\sin(\theta_e/2)$ and $s_e = \cos(\theta_e/2)$. Doubling the vector part therefore gives
+\begin{equation}
+\mathbf{e}_o := 2\mathbf{v}_e = 2\sin(\theta_e/2)\,\hat{\mathbf{k}} \;\approx\; \theta_e\,\hat{\mathbf{k}}
+\quad \text{for small } \theta_e,
+\label{eq:appA_eoderiv}
+\end{equation}
+recovering Equation~\eqref{eq:sv_eo} and confirming it is, to first order, the familiar
+axis-scaled-by-angle rotation-error vector used directly in the PD law of
+Equation~\eqref{eq:sv_twist}. The exact angle, rather than its small-angle approximation, follows
+from the same parametrization without any truncation:
+\begin{equation}
+\operatorname{atan2}\!\left( \lVert \mathbf{v}_e \rVert,\, s_e \right)
+= \operatorname{atan2}\!\left( \sin(\theta_e/2),\, \cos(\theta_e/2) \right) = \theta_e/2,
+\label{eq:appA_thetaederiv}
+\end{equation}
+using $\lVert \hat{\mathbf{k}} \rVert = 1$ and $\sin(\theta_e/2) \geq 0$ for $\theta_e \in [0, 2\pi)$,
+so that $\theta_e = 2\operatorname{atan2}(\lVert\mathbf{v}_e\rVert, s_e)$, exactly
+Equation~\eqref{eq:sv_thetae}. $\operatorname{atan2}$, rather than $\arccos$ or $\arcsin$ alone,
+is used because it remains numerically well-conditioned as $\theta_e \to 0$ and as $\theta_e \to
+2\pi$, where $\arccos$'s derivative diverges.
+
+\textbf{Equivalence with the rotation-matrix form of Chapter~\ref{chap:iapf}.} Equation
+\eqref{eq:iapf_orierror} defines the same relative rotation directly as a matrix, $R_e = R_d
+R_c^{-1}$, exactly $R_{\text{tgt}}R_{\text{curr}}^{-1}$ above, and extracts its axis-angle pair
+$(\theta, \mathbf{k})$ used in the PD law of Equation~\eqref{eq:iapf_angular}. From
+Equation~\eqref{eq:appA_rodrigues}, the antisymmetric part of $R_e$ isolates the cross-product term,
+$R_e - R_e^\top = 2\sin\theta\,[\hat{\mathbf{k}}]_\times$, giving the standard matrix-logarithm
+extraction
+\begin{equation}
+\theta = \arccos\!\left( \frac{\operatorname{tr}(R_e)-1}{2} \right), \qquad
+\hat{\mathbf{k}} = \frac{1}{2\sin\theta}
+\begin{bmatrix} (R_e)_{32}-(R_e)_{23} \\ (R_e)_{13}-(R_e)_{31} \\ (R_e)_{21}-(R_e)_{12} \end{bmatrix}.
+\label{eq:appA_matrixlog}
+\end{equation}
+Since $R_e$ and $\mathbf{Q}_e$ represent the identical relative rotation $R_{\text{tgt}}R_{\text{curr}}^{-1}$
+by construction, the $(\theta, \hat{\mathbf{k}})$ recovered by Equation~\eqref{eq:appA_matrixlog}
+from $R_e$ and the $(\theta_e, \hat{\mathbf{k}})$ recovered by
+Equations~\eqref{eq:appA_eoderiv}--\eqref{eq:appA_thetaederiv} from $\mathbf{Q}_e$ are the same
+axis and the same angle: $\theta \equiv \theta_e$ and $\hat{\mathbf{k}}$ is common to both. Chapter
+\ref{chap:shared_vision}'s $\mathbf{e}_o = 2\mathbf{v}_e$ and Chapter~\ref{chap:iapf}'s
+$\theta\hat{\mathbf{k}}$ are therefore the same orientation-error vector, obtained from the same
+underlying rotation by two different but equivalent parametrizations, unit quaternion in one chapter
+and rotation matrix in the other; the PD laws of Equation~\eqref{eq:sv_twist} and
+Equation~\eqref{eq:iapf_angular} are consequently the same feedback law applied to the same error
+signal, not two different constructions.
+
+%========================================================================
+
+%%% Local  Variables:
+%%% mode:  latex
+%%% TeX-master: "Thesis.tex"
+%%% End:

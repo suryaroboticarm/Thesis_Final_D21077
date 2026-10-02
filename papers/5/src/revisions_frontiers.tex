@@ -1,0 +1,591 @@
+\documentclass[utf8]{FrontiersinHarvard}
+\usepackage{url,hyperref,lineno,microtype,subcaption}
+\usepackage[onehalfspacing]{setspace}
+\usepackage{booktabs}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage{authblk}
+\newtheorem{theorem}{Theorem}
+\linenumbers
+\def\keyFont{\fontsize{8}{11}\helveticabold }
+\def\firstAuthorLast{S.K {et~al.}} %use et al only if is more than 1 author
+\def\Authors{Surya Prakash S.K\,$^{1,*}$, Darshan Kumar Prajapati\,$^{2}$  Bhuvan Narula\,$^{3}$ and Amit Shukla\,$^{2, *}$}
+\def\Address{$^{1}$Drone Lab, IIT Mandi, School of Mechanical and Materials Engineering, Mandi, India \\
+$^{2}$Drone Lab, IIT Mandi, Centre for Artificial Intelligence and Robotics, Mandi, India\\
+$^{3}$Drone Lab, IIT Mandi, School of Computing and Electrical Engineering, Mandi, India
+}
+\def\corrAuthor{Surya Prakash S.K, Amit Shukla}
+\def\corrEmail{s.surya1754@gmail.com, amitshukla@iitmandi.ac.in}
+\begin{document}
+\onecolumn
+\firstpage{1}
+
+\title[iAPF Motion Planning for Dual-arm Manipulation]{iAPF: An Improved Artificial Potential Field Framework for Asymmetric Dual-Arm Manipulation with Real-Time Inter-Arm Collision Avoidance for Industrial Component Handling}
+\author[\firstAuthorLast ]{\Authors}
+\address{}
+\correspondance{}
+
+\extraAuth{}
+
+\maketitle
+
+\begin{abstract}
+This paper presents a robust vision-based motion planning framework for dual-arm manipulators that introduces a novel three-way force equilibrium with velocity-dependent stabilization. The framework combines an improved Artificial Potential Field (iAPF) for linear velocity control with a Proportional-Derivative (PD) controller for angular velocity, creating a hybrid twist command for precise manipulation. A priority-based state machine enables human-like asymmetric dual-arm manipulation. Lyapunov stability analysis proves the asymptotic convergence to desired configurations. The method introduces a computationally efficient continuous distance calculation between links based on line segment configurations, enabling real-time collision monitoring. Experimental validation integrates a real-time vision system using YOLOv8 OBB that achieves 20 frames per second with 0.99/0.97 detection accuracy for bolts/nuts. Comparative tests against traditional APF methods demonstrate that the proposed approach provides stabilized motion planning with smoother trajectories and optimized spatial separation, effectively preventing inter-arm collisions during industrial component sorting.
+\tiny
+ \keyFont{ \section{Keywords:} Collision Avoidance, Improved Artificial Potential Field, Dual-Arm Manipulators, Industrial Automation.}
+\end{abstract}
+\section{Introduction}
+\label{sec1}
+The increasing demand for industrial automation is driven by the need to enhance production speed, accuracy, and efficiency. Robots are increasingly replacing human workers to address challenges like fatigue and maintain consistent performance over extended periods \citet{LIU2022102360}. Despite challenges with human workers, bi-manual operations offer significant value through component recognition and manipulation. Humans instinctively understand unfamiliar objects by material, shape, size, and color, enabling effective planning for separation or assembly tasks. Integrating these capabilities into robotics is crucial for upgrading industrial automation through: i) HRC - Human robot collaboration where human and robots collaboratively enhance the process efficiency ii) robots with capabilities that mimic human intelligence and dexterity. A dual-arm system with efficient inter-arm collision avoidance and vision perception provides a robust solution matching human-like manipulations, essential for industrial component handling in warehouse management, assembly lines, and manufacturing.
+
+In general, dual-arm manipulators offer improved dexterity and faster task completion compared to single arm manipulators. However, these advantages require careful consideration of movements to avoid inter-arm collisions while maintaining efficiency \citet{SMITH20121340}. Categories of dual-arm manipulators include: i) non-coordinated manipulations, where manipulators move independently executing different tasks, and ii) coordinated manipulations, involving combined movements with spatial and temporal synchronization in shared workspace. Coordinated manipulations further divide into symmetric (mirror movements with equal force distribution) and asymmetric (complementary movements with different force distributions) \citet{cooperative}. Though more challenging, asymmetric manipulations enable a wider range of complex tasks requiring coordinated actions. Integration with real-time vision and inter-arm collision awareness enhances robustness for industrial manufacturing assembly and warehouse management applications.
+
+The planning of dual-arm movements addresses coordination through two primary approaches: path planning and motion planning. Path planning generates geometric trajectories avoiding obstacles and self-collisions, prioritizing spatial relationships without timing information. Motion planning extends this by incorporating velocity profiles, acceleration constraints, and dynamic considerations, creating time-parametrized trajectories \citet{abbas2023systematic}. The selection between these approaches depends on application requirements, with industrial manipulation tasks often benefiting from motion planning's ability to manage the temporal aspects of coordination between manipulators. Further (\citet{tang2012review}) provides a comprehensive review of robot motion planning approaches, categorizing and analyzing research evolution from 1980-2010. They systematically compared conventional approaches (Bug Algorithms \citep{lumelsky1987path}, Roadmap \citep{asano1985visibility, aurenhammer1991voronoi, 99986}, Cell Decomposition, Potential Fields (\citet{khatib}), and Mathematical Programming) with heuristic methods (Neural Networks, Genetic Algorithms, Fuzzy Logic, etc.), demonstrating the field's evolution from conventional methods in the 1980s to predominantly heuristic approaches by the 2000s. Their analysis includes quantitative comparisons of implementation frequency for each approach and identifies future research directions for integrating perception, sensing, and motion planning systems gives useful insights for the research direction.
+
+
+\section{Related Work}
+\label{relatedwork}
+Numerous studies enhanced dual-arm motion planning for industrial manipulation. Robust inter-arm collision avoidance improved collaborative motion by enabling safe execution of coordinated tasks. This capability required continuous awareness of relative link configurations, maintaining safe distances while maximizing shared workspace utilization. Real-time collision monitoring provided the foundation for effective dual-arm coordination in dynamic environments.
+
+This literature review categorizes dual-arm manipulation research into three key areas: (i) collision detection methodologies (both geometric and alternative approaches), (ii) artificial potential field methods (ranging from classical formulations to specialized variants), and (iii) temporal coordination strategies. This organization traces the field's evolution while revealing challenges in real-time adaptation and asymmetric manipulation—challenges that suggest the potential value of extending APF approaches with improved force equilibrium mechanisms.
+
+Effective dual-arm manipulation requires robust collision detection to prevent inter-arm collisions while maintaining operational efficiency. Researchers have developed various approaches, from geometric primitives to advanced mathematical frameworks, to address this fundamental challenge. (\citet{LUMELSKY198555}) Introduced a parameter-based algorithm for minimum distance calculation between line segments in n-dimensional space. Using parameters t and u (range [0,1] for points inside segments), they established a framework handling all geometric configurations. The method first calculates minimum distance between infinite lines by minimizing a quadratic function, then verifies if these points lie within actual segments. By using parameter values to identify relevant endpoints, computational complexity reduces to 5n+12 multiplications and 8n+1 additions. However, it provides only discrete collision detection without continuous distance metrics, limiting its application in modern control approaches requiring gradient information for smooth motion planning. Furthermore (\citet{chang1990collision}), proposed collision detection approach uses minimum distance functions defined by Euclidean norms to determine collision risk between robot arms. Their method modeled robot links as cylinders with hemispheres and end-effector as spheres, then calculates distances between these primitives in three scenarios: line segment to line segment, line segment to point, and point to point. (\citet{lee2001real}) Proposed a hierarchical geometric collision detection algorithm for dual-arms using: bounding boxes, joint-joint distance thresholds, perpendicular distance calculations, and cross-product methods. Despite 30$\%$ computational improvement, it used simplified primitives, lacked mathematical formalism for complex configurations, and provided only discrete binary detection without continuous metrics for smooth planning. The approach showed reduced accuracy with near-parallel links and increased complexity in 3D without addressing degenerate cases or providing control gradient information. (\citet{collision_spatial_chains}) Presented the dual-stage collision detection algorithm for spatial closed chains first uses dual vector algebra and Plücker coordinates \citep{Miller2005} to quickly check for possible collisions between infinite cylinders. If potential collisions are detected, a second stage performs precise testing between finite cylinders using detailed geometric calculations. While mathematically elegant, this approach may not provide the continuous distance metrics needed by modern control systems for obstacle avoidance. The method formulates collision detection as a constrained nonlinear minimization problem, which introduces complexity for real-time applications, requiring conjugate gradient methods with barrier functions to solve. (\citet{845311}) Presented an RSS-based proximity algorithm that combines rectangles with uniform sphere expansion to create efficient bounding volumes. It builds hierarchical trees using covariance analysis and geometric "slab" properties for fast distance calculations. Performance improvements come from priority-directed search and triangle caching that leverages frame-to-frame coherence. While outperforming sphere-based hierarchies, the approach struggles with non-convex geometry (requiring decomposition into multiple parts) and can experience numerical instabilities in near-intersection cases, sometimes producing overly conservative distance estimates that reduce query efficiency. (\citet{RESCSANSKI2025102925}) provided insights into collaborative robotics for industrial additive manufacturing, highlighting effective collision detection methods using geometric approaches and real-time mechanisms for multi-arm systems. It analyzes motion planning strategies for cooperative robotic systems where coordination between arms is crucial for manufacturing quality and efficiency. The research presents a framework for cooperative robotic arm additive manufacturing (C-RAAM) configurations based on build volume overlap, enabling applications from large-scale homogeneous printing to specialized heterogeneous tooling. It demonstrates how inter-arm coordination and collision avoidance can be achieved through either preventative scheduling or real-time sensing and feedback.
+
+Apart from the geometric approaches, researchers explored alternative methods for collision detection for dual-arm collaboration. (\citet{FENG2020113}) Introduced a graph-based network approach for multi-robot collision detection where robots are represented as vertices with edges connecting interacting robots. It focuses on maintaining network connectivity through local and global edge management methods, using algebraic connectivity measures and market-based algorithms. Limitations include computational demands from continuous eigenvalue calculation, potential delays in link decisions, and the focus on network connectivity potentially overlooking actual collisions, which may compromise safety. (\citet{JAMISOLA2015158, 7274617}) The papers presented a transformation-based approach to multi-manipulator kinematics that focuses on relative motion between end-effectors while providing a mathematical framework for coordinate transformations relevant to absolute motion control. They express individual manipulator Jacobians with rotation and wrench transformation matrices to ensure coordinate consistency across the system. Their analysis shows positional errors increase significantly at higher angular velocities when transformation matrices are incomplete, emphasizing the need for rigorous mathematical formulations when multiple manipulators share a workspace. This approach complements geometric collision detection by providing insight into how manipulator kinematics must be properly transformed between reference frames for accurate motion planning. (\citet{FEI2004351}) Presented a dual-arm collision avoidance approach using configuration space (C-Space) representation. The methodology identifies collision regions through reachable manifold and contact manifold concepts, then applies the A* algorithm on discretized grids to find optimal paths. Path optimization is incorporated through scan rules. While innovative for its time, the approach has limitations: it relies on static geometric planning rather than continuous adaptation, uses discretized boundaries that may limit motion smoothness, and lacks mechanisms for maintaining optimal arm configurations during complex movements. (\citet{SCHMIDT2014711}) Implemented collision avoidance using Kinect depth sensors that process images by removing backgrounds and converting obstacles to 3D point clouds with efficient bounding box representation. Their system calculates minimum distances between robot and obstacles, enabling three strategies: warnings, stops, or path modification through vector decomposition. This methodology provided valuable insights for our vision perception conceptualization, particularly in how sensor data can be transformed into actionable spatial information for real-time goal attraction with collision avoidance in robot-robot collaborative environments.
+
+
+Physics-inspired potential field approaches offer an intuitive framework for robot motion planning by simulating attractive and repulsive forces. Beginning with Khatib's foundational work (\citet{khatib}), these methods have evolved to address limitations like local minima while accommodating increasingly complex manipulation tasks. (\citet{khatib}) Pioneered the Artificial Potential Field (APF) method, transforming discrete path planning into a continuous optimization problem. The robot is treated as a particle moving in a force field where an attractive force proportional to goal distance pulls the robot toward the target, while repulsive forces decaying quadratically with proximity push it away from obstacles. The robot follows the negative gradient of this composite potential function, implementing steepest descent optimization in configuration space. A key limitation is that APF can suffer from local minima in cluttered environments due to the superposition of attractive and repulsive forces. Subsequent research by (\citet{khosla1, khosla2, khosla3}) refined the original APF concept, by introducing n-ellipse representation that varies with distance. The n-elliptical iso-potential contours address the fundamental limitations in obstacle avoidance. Their innovative approach seamlessly transitioned from rectangular contours near obstacles $(n \to \infty)$ to circular fields at greater distances $(n \to 1)$, effectively eliminating local minima through geometric adaptation. While this method significantly improved single-arm manipulation, its computational complexity in calculating elliptical potentials limited real-time applications. Furthermore (\citet{priority}), proposed a dual-arm coordination strategy employing APF was proposed. This approach utilized an alternating master-slave paradigm. Initially, one arm (the master) plans its trajectory while treating the other arm as a static obstacle. Subsequently, the roles are reversed, with the previously slave arm now planning its trajectory while the other arm remains static. This alternating priority scheme continues until all objects reach their respective goals. The workspace is modeled using charged surfaces, generating repulsive forces to ensure collision avoidance between robots and obstacles. (\citet{Naeem, Naeem1}) Enhanced APF by integrating configuration sampling and sub-goal selection within a master-slave architecture and cooperative goal sampling framework. This approach achieved a 95.2\% success rate, demonstrating its effectiveness in handling more complex coordinated tasks. However, it comes at the cost of increased computational overhead and slower convergence rates (9.14s vs 4.65s) compared to the original APF (\citet{khatib}). Additionally, its application is limited to planar 2D manipulation scenarios.
+
+Furthermore, enhanced APF with specialized variants, (\citet{D-APF}) proposed D-APF (Dynamic Artificial Potential Field) for UAV path planning using exponential attractive and repulsive potential fields for moving target tracking and obstacle avoidance. It prioritizes vertical over horizontal motion, favoring altitude changes for obstacle avoidance. Combined forces generate smooth trajectories converted to velocity waypoints for PX4 autopilot, with separate PD-based orientation control. The force separation into vertical/horizontal components adds complexity and may cause oscillations during rapid directional changes, and the approach struggles with complex or closely spaced obstacles where vertical avoidance is insufficient. D-APF demonstrates potential field method evolution for aerial navigation, though dual-arm manipulation presents unique challenges requiring careful force field design. (\citet{1}) Used APF in a hybrid approach with their mobile dual-arm system combined with RRT(Rapidly Exploring Random Tree)-based motion planning for base navigation along with integrated vision and impedance control. (\citet{2}) Developed an optimized APF with velocity feedforward and simplified collision detection for redundant manipulators. (\citet{Health_robot, health_robot1}) Introduced an attractive potential field rotation method for local minima avoidance and develop a smooth attractive function $\sigma(d)$ to address Goals Non-Reachable with Obstacles Nearby (GNRON) issues. While effective for single-robot navigation, the approach is limited to navigation rather than manipulation scenarios. Despite mathematical elegance, it faces constraints when extended to multi-robot coordination and precision control in healthcare environments. Their rotation-based solution introduces computational considerations that must be balanced against real-time performance requirements in practical applications. (\citet{LIN2025110127}) Proposed a 3D APF approach for robotic arms that integrates force sensing with rotating repulsive fields to navigate narrow spaces. Their method treats the tool as a vector rather than a point and modifies repulsive force direction to prevent local minima. While their approach addressed single-arm collision avoidance, our method extends APF to dual-arm coordination through a novel three-way force equilibrium with exponential home-seeking forces and priority-based state transitions that enable asymmetric dual-arm manipulation with proven stability.
+
+Beyond spatial collision avoidance, successful dual-arm manipulation demands sophisticated temporal coordination to synchronize movements and optimize task execution. Researchers have developed various frameworks to address this critical dimension of collaborative robotic systems. (\citet{MONTANO201673}) Proposed a temporal coordination approach for multiple robots using Discretized Coordination Space where robots adjust timing along fixed paths. It builds a Collision-free Coordination Curve using state diagrams with wall-follower or impact heuristics to select motion directions. The computational complexity increasing exponentially with robot numbers ($3^{n}-1$ motion directions), lack of flexibility for dynamic environments since paths cannot be modified, and frequent robot idle periods when coordination points cannot be generated quickly enough, reducing system efficiency compared to reactive approaches like iAPF. (\citet{MALVIDOFRESNILLO2023102559}) Developed an Automatic Tool Changing system integrated with MoveIt's scene management, allowing robots to exchange end effectors by manipulating collision objects and communicating with hardware interfaces. For dual-arm coordination, they created synchronization methods that merge individual arm trajectories using various timing policies, enabling coordinated manipulation through time-adjusted motion plans or master-slave relationships. However, this planning-based approach has inherent limitations, it requires complete environment knowledge beforehand and lacks the reactivity needed for dynamic obstacle avoidance or real-time adaptation to changing conditions. (\citet{shin1989collision}) Presented a collision-free trajectory planning approach for two robotic arms sharing a workspace by transforming obstacles into virtual coordination space (VCS). Their method allows links of one robot to grow while shrinking the other to a point, visualizing all collision-free co-ordinations as curves in the VCS. While innovative for dual-arm coordination, their approach requires explicit modeling of virtual obstacles and lacks the dynamic adaptability of our three-way force equilibrium system that maintains optimal arm configurations throughout the workspace. (\citet{BASILE2012569}) Proposed a task-oriented motion planning framework that enables programming at the workpiece level through a Cooperative Planner handling task-space trajectories and kinematic transformations, while separate Arm Planners compute inverse kinematics for each robot. Despite efficient coordination through their taxonomy-based approach (distinguishing positioners and workers) and extended programming language with high-level instructions, their method suffers from limited real-time adaptability—it requires complete task specification beforehand and cannot dynamically respond to unexpected obstacles or environmental changes, unlike our iAPF method which continuously recalculates forces to generate reactive behaviors that smoothly adapt to changing conditions without extensive reprogramming.
+
+Furthermore, for effective object handling in real-time operation, precise detection of required components is an important aspect. Object detection has evolved from traditional computer vision techniques like SIFT, SURF, and BRIEF—which require manual feature extraction and parameter tuning (\citet{CVvsDL}) to more advanced CNN methods that automatically learn relevant features (\citet{CNN_advance}). For industrial component handling, accurate pose estimation is crucial. (\citet{me_1}) Presented a classical approach for bolt handling using k-mean clustering and chamfer matching, offering simple implementation without training data but limited by sensor quality and lighting conditions. (\citet{me}) Employed DeeplabV3P with classical techniques for bolt size estimation and sorting. Instance segmentation provides both classification and precise localization with clean edge masks (\citet{instance_seg_survey}). Mask R-CNN (\citet{MASKRCNN}), built on Faster R-CNN (\citet{FasterR-CNN}) which uses Region Proposal Networks instead of selective search (\citet{fastrcnn, RCNN}) adds a parallel branch for segmentation masks. Detectron2 (\citet{detectron2}), successor to Detectron (\citet{Detectron2018}) and maskrcnn-benchmark (\citet{massa2018mrcnn}), incorporates Mask R-CNN and RetinaNet with focal loss. For real-time inference on CPU machines, Ultralytics' YOLOv8 and YOLOv11 (\citet{yolov8_ultralytics, yolo11_ultralytic}) offer faster performance through single-pass architecture, lightweight backbones, anchor-free detection, and efficient feature pyramids. YOLOv8's oriented bounding boxes capability avoids computationally expensive instance segmentation.
+
+Our improved Artificial Potential Field (iAPF) approach addresses key limitations identified across existing methodologies. While geometric approaches like (\citet{LUMELSKY198555}) and (\citet{chang1990collision}) provide precise collision detection, they lack continuous distance metrics for smooth motion planning. Traditional APF methods by (\citet{khatib}) offer intuitive frameworks but suffer from local minima, particularly in cluttered environments. Prior coordination strategies like (\citet{MONTANO201673}) discretized coordination space and (\citet{MALVIDOFRESNILLO2023102559}) master-slave paradigm lack dynamic adaptability to changing environments.
+
+iAPF overcomes these limitations through a novel three-way force equilibrium that balances goal attraction, obstacle repulsion, and home-seeking behavior. Unlike (\citet{Naeem, Naeem1}) approach, which showed slower convergence despite higher success rates, our method achieves real-time performance without sacrificing stability. Where (\citet{Health_robot, health_robot1}) rotating repulsive fields work well for single arms, our approach extends to dual-arm coordination with a priority-based state transition mechanism that enables truly asymmetric dual-arm manipulation without oscillations or deadlocks. By addressing the need for continuous adaptation rather than pre-planned trajectories, iAPF motion planning along with real-time 20 frames per second(FPS) inference provides a robust solution for collaborative robot tasks in dynamic industrial environments like manufacturing, warehouse management and assembly line fields. Our novel iAPF methodology addresses these limitations through the following key contributions:
+
+\begin{enumerate}
+    \item \textbf{Case-Specific Analytical Inter-Arm Distance} - Algorithm employing closed-form vector solutions for parallel, intersecting, and skew link configurations with epsilon-based numerical stability handling.
+    \item \textbf{Hybrid Linear-Angular Control Framework} - iAPF-derived linear velocity control coupled with independent PD(Proportional Derivative)-regulated angular velocity, creating a dual-control system with proven Lyapunov stability for exponential $(O(e^d))$ attractive and inverse power-law $(O(d^{-2.3}))$ repulsive force integration.
+    \item \textbf{4-DoF Vision-Based Pose Estimation} - Real-time component detection (20 FPS) with oriented bounding box analysis providing position and yaw for precise grasp planning.
+    \item \textbf{State-Conditional Kinodynamic Control} - Velocity damping coefficients and task-specific z-axis constraints adaptively modulated based on operational phase (targeting, gripping, transport).
+    \item \textbf{Priority-Based Dual-Arm Task Allocation} - Hierarchical state machine with comparative-distance-based resource locking for deadlock-free simultaneous manipulation in shared workspaces. 
+\end{enumerate}
+
+This paper is organized, beginning with Sec.~\ref{sec1} \textcolor{olive}{introduces} the motivation and significance of asymmetric bi manual manipulations in industrial automation and a systematic review of relevant literature contributions in the field, highlighting the advantages of our proposed method over existing approaches. Sec.~\ref{method} \textcolor{olive}{presents} the proposed methodology for establishing inter-arm collision avoidance in dual-arm motion planning, incorporating real-time vision and providing theoretical proofs for the proposed potential field formulations. The experimental setup established to demonstrate the real-time components sorting, hardware used with specifications and required transformation of frames explained in Sec.~\ref{experimental_setp}. Sec.~\ref{results} \textcolor{olive}{presents} a comparative analysis between the proposed iAPF and traditional APF methods, highlighting the advantages of the proposed approach, and showcases the performance metrics of the deep learning model. Sec.~\ref{conclusion} \textcolor{olive}{summarizes} the key findings of this work, presents the conclusions drawn from the experimental results, and discusses potential future research directions.
+
+\section{Methodology}
+\label{method}
+\textcolor{blue}{The proposed overall methodology as shown in Fig.~\ref{overall_method} integrates four key components:} (1) minimum distance calculation between inter-arm links using geometric classification, (2)  vision-based pose estimation for industrial components, (3) three-way force equilibrium combining attractive, repulsive, and home-seeking forces with velocity-dependent stabilization and (4) state-based asymmetric coordination for dual-arm manipulation with priority locking. Together, these components enable collision-free, coordinated manipulation in shared workspaces.
+
+\subsection{Minimum Distance Calculation between Inter-Arm Links Using Geometric Classification}
+\label{minimum_dist}
+We modeled each robotic arm link as a line segment in 3D space using Eq.~\ref{forward_kin_eq} and Eq.~\ref{transformation_matrix} as given in Eq.~\ref{segment_equation} using D-H parameters shown in Fig.~\ref{forward_kinematics} enabling efficient minimum distance calculation between inter-arm links through geometric classification as parallel, intersecting, or skew configurations.
+
+%%%%%%%%%%%%%%%%%%%%
+\textcolor{olive}{
+\begin{equation}
+    T^{i-1}_{i,k} = \begin{bmatrix}
+    \cos(\theta_i) & -\cos(\alpha_i)\sin(\theta_i) & \sin(\alpha_i)\sin(\theta_i) &     a_i\cos(\theta_i) \\
+    \sin(\theta_i) & \cos(\alpha_i)\cos(\theta_i) & -\sin(\alpha_i)\cos(\theta_i) &     a_i\sin(\theta_i) \\
+    0 & \sin(\alpha_i) & \cos(\alpha_i) & d_i \\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
+    \label{forward_kin_eq}
+\end{equation}}
+%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%
+\textcolor{olive}{
+\begin{equation}
+    T^{i-1}_{i,k} = \begin{bmatrix}
+    \mathbf{R}_{i,k}^{i-1} & \mathbf{p}_{i,k}^{i-1} \\
+    \mathbf{0} & 1
+    \end{bmatrix}
+    \label{transformation_matrix}
+\end{equation}}
+%%%%%%%%%%%%%%%%%%
+\textcolor{olive}{
+\begin{equation}
+    S_{i,k} = \mathbf{p}_{i,k}^{i-1}
+    \label{segment_equation}
+\end{equation}}
+%%%%%%%%%%%%%%%%%%%%
+\textcolor{olive}{
+\begin{equation}
+    T^0_{tool,k} = T^0_{1,k} \cdot T^1_{2,k} \cdot T^2_{3,k} \cdot T^3_{4,k} \cdot T^4_{5,k} \cdot T^5_{6,k} \cdot T^6_{tool,k}
+    \label{fwdeq}
+\end{equation}}
+\textcolor{olive}{Where $i = 1 \dots 6$ represents the joint number, tool represents the end-effector frame, $k$ denotes the arm identifier (right/left arm), \( \mathbf{R}_{i,k}^{i-1} \in \mathbb{R}^{3 \times 3} \) is the rotation matrix, and \( \mathbf{p}_{i,k}^{i-1} \in \mathbb{R}^3 \) is the position vector.}
+%%%%%%%%%%%%%%%%%%%
+
+\begin{theorem}[Segment Properties]
+Every line segment $S$ possesses, convexity: $\forall x,y \in S, \lambda x + (1-\lambda)y \in S$ for $\lambda \in [0,1]$, compactness of $S$ is closed and bounded, connectedness of $S$ is path-connected. \citet{munkrestopology}
+\end{theorem}
+\noindent The segment between two bounding points $p_{1}, p_{2}$ is $S[p_1,p_2]$, direction vector $\Vec{\mathrm{d}} = p_2-p_1$, unit direction $\hat{\mathrm{d}} = \frac{\Vec{\mathrm{d}}}{\|\Vec{\mathrm{d}}\|}$, and normal space is $N = \{v \in \mathbb{R}^3 \mid v \cdot \hat{\mathrm{d}} = 0\}$. The normal space $N$ is a two-dimensional subspace of $\mathbb{R}^3$. \citet{o2006elementary}
+
+\noindent For segments $S_1,S_2$ with direction vectors $\Vec{\mathrm{d}_1},\Vec{\mathrm{d}_2}$, then the angle between them is:
+\[
+\theta = \arccos\left(\frac{\vec{\mathrm{d}_1} \cdot \vec{\mathrm{d}_2}}{\|\vec{\mathrm{d}_1}\|\|\vec{\mathrm{d}_2}\|}\right)
+\]
+
+\begin{theorem}[Angle Invariance]
+The angle $\theta$ between segments is invariant under rigid body transformations, such as translation and rotation. \citet{gallier2011geometric} 
+\end{theorem}
+
+\begin{theorem}[Configuration Completeness]
+Every pair of line segments falls exactly into one of:
+\begin{enumerate}
+    \item \text{Intersecting}
+    \item \text{Parallel}
+    \item \text{Skew}
+\end{enumerate} \citet{pottmann2001computational}
+\end{theorem}
+
+\begin{theorem}[Metric Space Properties]
+The function $d$ satisfies, positive definiteness $d(x,y) \geq 0$, $d(x,y) = 0$ when $x = y$, symmetry $d(x,y) = d(y,x)$ and triangle inequality $d(x,z) \leq d(x,y) + d(y,z)$. Furthermore, $(\mathbb{R}^3,d)$ is a complete metric space.
+\end{theorem}
+
+\noindent The distance function $d$ is continuous in both arguments if and only if:\newline
+For all $\epsilon > 0$, there exists a $\delta > 0$ such that if $\|x_1 - x_2\| < \delta$ and $\|y_1 - y_2\| < \delta$, then $|d(x_1, y_1) - d(x_2, y_2)| < \epsilon$.
+
+\noindent The distance between a line segment on the left arm \( S_{i\text{left}} \) and a line segment on the right arm \( S_{i\text{right}} \) is defined as:
+\begin{equation}
+    d(S_{i\text{left}}, S_{i\text{right}}) = \min \|x - y\|
+    \label{min_dist}
+\end{equation}
+
+where, \( x \in S_{i\text{left}}, \quad y \in S_{i\text{right}} \) \(\in \mathbb{R}^3 \).
+
+The minimum distance between any pair of links in the dual-arm system is determined based on their geometric configuration, one of three cases: parallel, intersecting, or skew as in Fig.~\ref{Flowchart_distance}. The method of distance calculation varies depending on the specific geometric configuration. A systematic formulation for finding the minimum distance between dual-arm links in 3D space has been developed. Further the proposed method for calculating minimum distance is verified as shown in Fig.~\ref{min_dist_real-time}. \textit{\textcolor{teal}{Example Distance
+Calculation between various cases of line segments are shown in Supplementary File in Figure S9}}
+
+\subsection{Vision-based Pose Estimation of Industrial Components}
+\label{deep_learning}
+Real-time asymmetric dual-arm manipulation requires rapid inference of object information within the system's workspace. Prioritizing inference speed for effective real-time object handling, we selected the YOLOv8 OBB model for object detection, which achieved 20 frames per second on our hardware configuration while maintaining high detection accuracy. \textcolor{olive}{The systematic evaluation of various models used on our custom data as shown in Table.~\ref{tbl2}.}
+\subsubsection{Data Collection and Labeling}
+Data collection and data labeling as shown in Fig.~\ref{datacollection}, are crucial steps in preparing meaningful information to train deep learning models. We carefully prepared our dataset, incorporating diverse real-world conditions, including varying backgrounds (cluttered workspaces, different table surfaces), lighting, and object ages (new and old). To enhance the model's robustness against false positives, we employed a strategic negative mining technique by adding a background/reference class. This class included objects visually similar to the target objects (bolts, nuts) and images of the empty workspace on the table. Our dataset, comprising 1,230 images, divided into training, validation, and testing sets of 1120, 80, and 30 images, respectively. Furthermore, we used data augmentation techniques of the Ultralytics training framework, increasing the dataset size tenfold. As a result, we achieved a prediction rate of 20 frames per second during model deployment, crucial for real-time applications. \textcolor{blue}{The system operates under controlled workspace assumptions where only target components are present, eliminating occlusion challenges typical in structured industrial sorting environments.}
+
+After detecting objects (nuts and bolts) globally from an RGB-D camera, further inferred object centroids ($c_{x}$, $c_{y}$) and yaw ($\theta$) along with dimensions of bounding box ($h$, $w$) using YOLOv8 OBB inference, as illustrated in Fig.~\ref{fig:obb}. Furthermore, this information is transformed into real-world coordinates from the image coordinates using projective transformations using camera intrinsic properties($f_{x}$, $f_{y}$, $C_{x}$, $C_{y}$) shown below. Considering an object detected in the globally fixed camera frame, using predictions from our model is as shown in Eq.~\ref{feature_vec}.
+\begin{equation}
+    [K] = \begin{bmatrix}
+    f_{x} & 0 & C_{x} \\
+    0 & f_{y} & C_{y} \\
+    0 & 0 & 1
+    \end{bmatrix} = \begin{bmatrix}
+    602.063 & 0 & 317.316 \\
+    0 & 602.063 & 243.314 \\
+    0 & 0 & 1
+\end{bmatrix}
+\label{caliberation_matrix}
+\end{equation}
+\begin{equation}
+F_{p} = [c_{x}, c_{y}, \theta, h, w].
+\label{feature_vec}
+\end{equation}
+Where [K] is camera intrinsic parameter matrix of Intel Realsense2 D415, $F_{p}$ is information of features of the objects in pixels. The depth value Z for respective object's ($c_{x}$, $c_{y}$) is obtained from the aligned depth camera. The transformation from image coordinates ($c_{x}$, $c_{y}$) to 3-D real world coordinates follows the projective transformation as shown in Eq.~\ref{projective_trans}.
+\begin{equation}
+    Z = \frac{\text{depth}(c_x, c_y)}{\gamma}, \quad
+    X = \frac{c_x - C_x}{f_x} \cdot Z, \quad
+    Y = \frac{c_y - C_y}{f_y} \cdot Z.
+    \label{projective_trans}
+\end{equation}
+$\gamma$ is scaling factor, ($C_{x}$, $C_{y}$) is the principal point of the camera in pixels, $f_{x}$, $f_{y}$ are the focal lengths in pixels, and $Z$ is depth value in meters.
+
+We further estimate its size using the width $h$ of its oriented bounding box (in pixels) and angle $\theta$, as illustrated in Eq.~\ref{fig:obb} using Eq.~\ref{sizeeq} and Eq.~\ref{yaw_angle}.
+\begin{equation}
+        \text{size} = (\frac{h}{f_{x}} \cdot Z) \cdot \gamma. \\
+    \label{sizeeq}
+\end{equation}
+\begin{equation}
+    \text{angle} = \theta.
+    \label{yaw_angle}
+\end{equation}
+The final feature information of industrial components(nut/bolt) in real world coordinates are : 
+\begin{equation}
+    F_{\textbf{m}\\ nut/bolt} = [X, Y, Z, \theta, \text{size}]
+    \label{projective_transformation}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Improved Artificial Potential Field(iAPF) Framework for Dual-Arm Motion Planning}
+\textcolor{olive}{\noindent Considering the robot position \( \mathbf{r}\), goal position \( \mathbf{g} \), other arm's end-effector position \( \mathbf{o}\), and $d$ is minimum distance between inter-arms as in Eq.~\ref{min_dist},  the force fields are defined as follows:}
+\begin{equation}
+\begin{aligned}
+\vec{\mathbf{f}}_{\text{att}}(\mathbf{r}, \mathbf{g}) &= 
+k_a \cdot \left( \exp(\|\mathbf{g} - \mathbf{r}\|) - 1 \right) \cdot \frac{\mathbf{g} - \mathbf{r}}{\|\mathbf{g} - \mathbf{r}\|}
+\end{aligned}
+\label{eq:attractive_force}
+\end{equation}
+where,
+\( k_a \) is attractive force gain constant.
+\begin{equation}
+\textcolor{olive}{
+\begin{aligned}
+% \text{Repulsive Force Field} = 
+\vec{\mathbf{f}}_{\text{rep}}(\mathbf{r}, \mathbf{o}, \mathbf{d_{min}}) = 
+k_r \cdot \frac{1}{d_{min}^\eta} \cdot \frac{\mathbf{o} - \mathbf{r}}{\|\mathbf{o} - \mathbf{r}\|}
+\end{aligned}}
+\label{eq:repulsive_force}
+\end{equation}
+\textcolor{olive}{\noindent where $k_r$ is the repulsive force gain constant, $\eta$ is the decay exponent, $o$ is the obstacle position (other arm's end-effector position), and $d_{min}$ is the minimum distance between arm links calculated using the geometric classification method described in Sec.~\ref{minimum_dist}.}
+
+\textcolor{blue}{ The home-seeking force represents a novel integration to traditional APF, providing exponential attraction towards the home position of the manipulator.}
+\begin{equation}
+    \begin{aligned}
+    % \text{Home-Seeking Force Field} = 
+    \vec{\mathbf{f}}_{\text{home}}(\mathbf{r}, \mathbf{h}) = k_h \cdot \left( \exp(\|\mathbf{h} - \mathbf{r}\|) - 1 \right) \cdot \frac{\mathbf{h} - \mathbf{r}}{\|\mathbf{h} - \mathbf{r}\|}
+    \end{aligned}
+    \label{homeforce}
+\end{equation}
+where, \( k_h \) is the home force gain constant, \( \mathbf{h} \) is home position \textcolor{olive}{defined as the predetermined starting state and safe configuration where each manipulator returns when no target objects are detected, ensuring collision-free states and optimal workspace coverage}.
+\begin{equation}
+    % \text{Damping Force} = 
+    \vec{\mathbf{f}}_{\text{damp}}({v}) = -k_d \cdot {\vec{v}} 
+    \label{dampforce}
+\end{equation}
+where, \( k_d \) is damping coefficient and \( \vec{{v}} \) is current velocity.
+
+The carefully designed force fields are crucial for achieving successful asymmetric bi-manual manipulation. The exponential goal attraction force field Eq.~\ref{eq:attractive_force}, significantly enhances convergence speed and facilitates smooth transitions near the goal, essential for achieving precise pick-and-place operations. The inverse-distance repulsive force Eq.~\ref{eq:repulsive_force}, effectively prevents collisions between manipulators by exerting a repulsive force that scales inversely with the distance between them, ensuring robust collision avoidance while minimizing unnecessary interference. \textcolor{blue}{The exponential home-seeking force Eq.~\ref{homeforce}, counteracts excessive arm extension, particularly in scenarios where strong repulsive forces arise due to near-goal conflicts. By encouraging the arms to return to a more neutral position, it maintains system stability and facilitates balanced convergence.} Furthermore, the velocity-dependent damping force Eq.~\ref{dampforce}, plays a crucial role in stabilizing the system by dissipating energy, effectively reducing the oscillatory behaviors that may arise during arm interactions, ensuring smooth and controlled trajectories.
+
+\noindent The resultant force with damping is given by:
+\begin{equation}
+\vec{\mathbf{f}}_{\text{resultant}} = \vec{\mathbf{f}}_{\text{att}} + \vec{\mathbf{f}}_{\text{rep}} + \vec{\mathbf{f}}_{\text{home}} - k_d \cdot \vec{{v}}
+\label{eq:resultant_force}
+\end{equation}
+From the visual perception module described in Sec.~\ref{deep_learning}, the feature information obtained in Cartesian coordinates, as defined in Eq.~\ref{projective_transformation}, provides the position and orientation of the goal.
+\subsubsection{iAPF based Linear Velocities}
+Considering the position of objects obtained from the vision module Eq.~\ref{projective_transformation}, the generation of force fields is initiated to guide the manipulators to their respective target positions. In the absence of object detection, the target position for each manipulator defaults to its home position. The linear velocities of manipulators are determined as follows:
+\begin{equation}
+    \vec{v}_{k} = \frac{(\vec{\mathbf{f}}_{\text{resultant}})_{k}}{\mathbf{s}}
+    \label{linearvel}
+\end{equation}
+where, $\mathbf{s}$ is a scaling factor and $k$ is left/right.
+The stability analysis for velocity based on iAPF, as defined in Eq.~\ref{linearvel}, is crucial due to the non-linear nature of the potential functions. It is essential to ensure convergence to the desired position while maintaining bounded velocities. Lyapunov stability analysis shows that the superposition of attractive, repulsive, and home-seeking potentials, combined with velocity damping and state machine based priority mechanism as shown in Fig.~\ref{state_machine} and Fig.~\ref{Priority Mechanism}, results in stable robot motion to the target objects.
+
+Considering the manipulator's end-effector position as $x \in\mathbf{R}^3$,
+\[
+\begin{aligned}
+\dot{x} &= v, \\
+v &= k_v \cdot \mathbf{{f}}_{\text{resultant}}(x)
+\end{aligned}\]
+\[\begin{aligned}
+\mathbf{{f}}_{\text{resultant}}(x) &= -\nabla V_{\text{total}}(x) - k_{d} v.
+\end{aligned}
+\]
+The gradient $\nabla V_{\text{total}}(x)$ points the direction of steepest increase of the potential field, negative sense of this term, directs the point towards lower potential, away from obstacle and near to goal, the damping force $k_d v$ is subtracted from this total potential, to oppose motion proportional to velocity direction.
+
+\[
+\begin{aligned}
+V_{\text{total}}(x) &= V_{\text{att}}(x) + V_{\text{rep}}(x) + V_{\text{home}}(x), \\
+\noindent \text{where}, \\ 
+V_{\text{att}}(x) &= k_a \big(\exp(\|x - x_{\text{goal}}\|) - 1\big), \\
+V_{\text{rep}}(x) &= \frac{k_r}{d_{\text{obs}}^{\eta}}, \\
+V_{\text{home}}(x) &= k_h \big(\exp(\|x - x_{\text{home}}\|) - 1\big).
+\end{aligned}
+\]
+\noindent In the pre-priority state, when robots start to move towards goal, the Lyapunov function is selected as:
+\[
+L_{1}(x) = V_{\text{total}}(x),
+\]
+where $L_{1}(x) > 0$ for all $x$, and $L_{1}(x)$ is continuously differentiable.
+%% Use \section commands to start a section
+
+The time trajectory of $L_{1}(x)$ is given by:
+\[
+\dot{L_{1}}(x) = \nabla V_{\text{total}}(x) \dot{x},
+\]
+\[
+\dot{L_{1}}(x) = \nabla V_{\text{total}}(x) v,
+\]
+\[
+\dot{L_{1}}(x) = \nabla V_{\text{total}}(x) \big[k_{v}(\text{f}_{\text{att}} + \text{f}_{\text{rep}} + \text{f}_{\text{home}} - k_{d} \cdot v)\big].
+\]
+At the pick-lock state ($x = x_{\text{transition}}$):\newline
+making obstacle charge $c_{obs}$ and home charge $c_{home}$ as zero to enable asymmetric bi-manual manipulation. 
+\[
+\text{f}_{\text{rep}} + \text{f}_{\text{home}} = 0.
+\]
+
+\noindent Substituting these conditions, we get:
+\[
+\dot{L_{1}}(x_{\text{transition}}) = \nabla V_{\text{att}}(x) \big[k_{v}(\text{f}_{\text{att}} - k_{d} \cdot v)\big].
+\]
+
+\noindent The time trajectory at $x_{\text{transition}}$ indicates potential for further movement.
+\[
+\dot{L_{1}}(x_{\text{transition}}) = \nabla V_{\text{att}}(x) \big[k_{v}(-\nabla V_{\text{att}}(x) - 2k_{d} \cdot v)\big].
+\]
+
+\noindent Simplifying, we have:
+\[
+\dot{L_{1}}(x_{\text{transition}}) = -k_{v}||\nabla V_{\text{att}}(x)||^{2} - 2k_{v}k_{d}\nabla V_{\text{att}}(x) \cdot v.
+\]
+
+\noindent For $k_{d} > 0$ and $k_{v} > 0$, the following holds:
+\[
+\dot{L_{1}}(x_{\text{transition}}) < 0 \quad \text{for all } x \neq x_{\text{goal}},
+\]
+\[
+\dot{L_{1}}(x_{\text{transition}}) = 0 \quad \text{for } x = x_{\text{goal}}.
+\]
+The stability analysis demonstrates, dual-arm iAPF control achieves coordinated manipulation through two key phases. Initially, both manipulators move under complete force set (attractive, repulsive, home-seeking) with Lyapunov function $L_{1}(x)$ ensuring stable concurrent motion. When priority is assigned based on goal distance, the system transitions to a reduced force set (attractive and damping only) for the prioritized arm, with $L_{1}(x)$ guaranteeing asymptotic stability to the goal position. The non-zero $\dot{L_{1}}(x)$ at transition points enables sequential task completion while maintaining collision avoidance, validating the proposed approach's theoretical stability and practical effectiveness for industrial manipulation tasks.
+
+\subsubsection{PD controller based Angular Velocities}
+Considering the orientation of objects obtained from the vision module, the current end-effector orientation for each manipulator is obtained through real-time forward kinematics of the dual-arm system, providing the basis for orientation control.
+\noindent The current orientation of the end-effector is given by:
+\[
+\bm{\theta}_{c} = [\theta_{cx}, \theta_{cy}, \theta_{cz}] \in SO(3)
+\]
+
+\noindent The desired orientation, obtained from visual perception given by:
+\[
+\bm{\theta}_{d} = [\theta_{dx}, \theta_{dy}, \theta_{dz}] \in SO(3)
+\]
+
+\noindent The corresponding rotation matrix is represented as:
+\[
+R(\bm{\theta}) = R_{z}(\theta_{z}) R_{y}(\theta_{y}) R_{x}(\theta_{x})
+\]
+
+\noindent The error rotation matrix is given by:
+\[
+R_{e} = R_{d} R_{c}^{-1} \in SO(3)
+\]
+The error rotation matrix \( R_{e} \) can be expressed in the axis-angle representation, parameterized by angle \( \theta \) and  axis \( \bm{k} = [k_{x}, k_{y}, k_{z}] \):
+
+\noindent The PD control law for orientation control of manipulator given by:
+\begin{equation}
+   \bm{\omega}_{k} = K_p \cdot {\theta} \cdot \bm{k} + K_d \cdot \frac{d}{dt} ({\theta} \cdot \bm{k})
+    \label{angularvel}
+\end{equation}
+Where $K_{p}$ $\in \mathbb{R}^{3\times3}$ is the proportional gain matrix, $K_{d}$ $\in \mathbb{R}^{3\times3}$ is the derivative gain matrix, $\omega \in \mathbb{R}^{3}$ is angular velocity vector and $\theta \in \mathbb{R}$ is the rotation angle error derived from the error rotation matrix $R_{e}$.
+\section{Experimental Setup}
+\label{experimental_setp}
+The experimental setup for demonstrating asymmetric dual-arm manipulation is established with reference frames as shown in Fig.~\ref{fig:Visual_Servoing}. The system comprises two 6-DOF Kinova Gen3 Lite arms mounted on a fixed table, with an overhead Realsense2 D415 camera providing a global view of the workspace. Processing is handled by an Intel Nuc9I7Qnx with 32 GB RAM, which connects to the manipulators via TCP/IP sockets using a specific communication protocol, while the camera interfaces through USB. The Kinova-Kortex Python API is used for manipulator control, and the ROS-Noetic framework facilitates publishing and subscribing to the vision module's inference data.
+
+Individual forward kinematics, as given by Eq.~\ref{fwdeq}, provide the position and orientation of each manipulator's end-effector with respect to its respective base frame. Furthermore, $T^{r}_{c}$ represents the transformation of the camera in the right arm's base frame, while $T^{l}_{r}$ denotes the transformation of the right arm in the left arm's base frame.
+\begin{equation*}
+T^{r}_{c} = \begin{bmatrix}
+1 & 0 & 0 & 0.251 \\
+0 & -1& 0 & -0.211 \\
+0 & 0 & -1 & 0.75 \\
+0 & 0 & 0 & 1.0 \\
+\end{bmatrix}
+T^{l}_{r} = \begin{bmatrix}
+-1 & 0 & 0 & L \\
+0 & -1 & 0 & 0.0 \\
+0 & 0 & 1 & 0.0 \\
+0 & 0 & 0 & 1.0 \\
+\end{bmatrix}
+\end{equation*}
+The further pose from Eq.~\ref{projective_transformation}, is transformed to the left arm's base as:
+\begin{equation}
+    \mathbf{p}^{l}_i = T^{l}_{r} T^{r}_{c} \mathbf{p}^{c}_{i}
+\end{equation}
+
+where \( \mathbf{p}^{c}_{i} \) is given by:
+\[
+\mathbf{p}^{c}_{i} =
+\begin{bmatrix}
+X^{c}_{i} & Y^{c}_{i} & Z^{c}_{i} & 1.0\\
+\end{bmatrix}
+^{T}
+\]
+
+The rotation angle \( \mathbf{\theta}_{i} \) is computed as:
+\[
+    \mathbf{\theta}_{i} = \mathbf{\theta}_{c_{i}} \cdot \frac{180}{\pi}\]
+The gripper angle \( \theta_{\text{gripper}_{k}} \) for the arm is given by:
+\begin{equation}
+    \theta_{\text{gripper}_{k}} = 270 - \theta_{i}    
+\end{equation}
+This ensures proper alignment between the gripper and nut/bolt for grasping.
+
+\noindent Both linear velocities (from iAPF) and angular velocities (from PD control) for both arms are initially calculated in left base frame using Eq.~\ref{linearvel} and Eq.~\ref{angularvel}. Subsequently, the right arm velocities (both linear and angular) are transformed from left base frame to right base frame using $T^{r}_{l}$ rotation matrix, while left arm velocities remain in left base frame as shown in Eq.~\ref{transform_eqns}. 
+\begin{equation}
+    v_{r} = R^{r}_{l}\cdot (v_{r})_{l}; \quad
+    \mathbf{\omega}_{r} = R^{r}_{l}\cdot (\mathbf{\omega}_{r})_{l}; \quad
+    v_{l} = v_{l}; \quad
+    \mathbf{\omega}_{l} = \mathbf{\omega}_{l}.
+    \label{transform_eqns}
+\end{equation}
+    
+\noindent Where \( i \) represents the nut/bolt, \( k \) denotes the right/left arm, \(R^{r}_{l} \) is rotation matrix of \(T^{r}_{l}\), \((v_{r})_{l}, (\mathbf{\omega}_{r})_{l}\) are linear and angular velocities of right arm in left base and \(v_{r}, \mathbf{\omega}_{r}\) are transformed velocities in right base frame.
+\section{Results and Discussions}
+\label{results}
+To validate the proposed system for asymmetric dual-arm manipulation framework for sorting industrial components, created challenging scenarios by placing nuts and bolts in close proximity, deliberately inducing goal conflicts between the manipulators. This setup rigorously tests the framework's collision avoidance capabilities, priority-based state transitions, and the effectiveness of exponential attractive home-seeking forces in maintaining stable coordination during sorting tasks.
+
+The performance metrics for the bolt and nut detection classes demonstrate superior discrimination capabilities compared to the reference class. Bolts achieve 0.99 detection accuracy and nuts achieve 0.97 detection accuracy, with minimal inter-class confusion of 0.02. The F1 score reaches 0.89 at a confidence threshold of 0.120, while precision achieves 1.00 at 0.808. Recall maintains 1.00 at low confidence thresholds, indicating robust detection even under varying conditions. These metrics validate the model's effectiveness in discriminating between nuts and bolts while successfully handling the reference class for false positive reduction. \textit{\textcolor{teal}{The final deployment results are as shown in Deep Learning Model Metrics and
+Real-Time Vision Update Experiment Figures are shown in Supplementary File Figure S1-S8.}}
+
+The proposed iAPF, incorporating three distinct force fields, effectively addressed near-goal conflict scenarios, as demonstrated in Fig.~\ref{final_trajec1}. The implementation of three force fields: exponential goal attraction, inverse-distance other-arm repulsion, and home exponential attraction, demonstrates superior control over dual-arm trajectories, effectively mitigating self-collisions. The transition point shows deliberate stop and stable movement of the arms during collision possible scenarios and maintains better spatial separation throughout their movements. The exponential home attraction force acts as a regulator, preventing excessive arm extension in scenarios where near-goal conflicts result in strong repulsive forces. The establishment of a three-way force equilibrium results in more predictable and controlled motion paths. The home force establishes natural boundaries for arm movements, maintaining optimal manipulator poses and preventing over-extension. Particularly, how the trajectories exhibit smoother curves with minimal oscillations, as the arms move toward goals, the exponential home attraction scales with distance, providing graduated control that keeps configurations within safe operating ranges. This makes the system more robust against kinematic singularities while ensuring efficient task completion.
+
+In traditional attractive-repulsive APF, as shown in Fig.~\ref{final_trajec2} without home attraction, the system exhibits inherent instabilities near goal regions. While the arms successfully navigate to their target locations, the trajectories demonstrate less controlled movements with larger sweeping motions and more aggressive approaches. The fundamental issue lies in the force imbalance - as both arms approach their respective goals simultaneously, the attractive forces dominate while the inter-arm distance decreases, causing a sudden spike in repulsive forces. This force antagonism leads to oscillatory behaviors and potential over-extension of the arms. Without a stabilizing home force, the arms can reach configurations near kinematic singularities with no natural mechanism to recover optimal poses. The problem is particularly pronounced when both arms operate in close proximity, where the rapid transition between attraction-dominated and repulsion-dominated states can lead to unstable motion patterns.
+
+Observing Fig.~\ref{Attrction_force_pattern}(a), Fig.~\ref{Repulsive_force_pattern}(a) and Fig.~\ref{final_trajec1}, represents attractive and repulsive force trends for our iAPF which represents three-way force equilibrium: 
+Both arms exhibit controlled convergence to home positions with initial attractive forces of $\approx$900 (left) and $\approx$700 (right) stabilizing to $\approx$50 baseline, demonstrating effective home-seeking behavior before vision activation. Upon target detection at t=248, right arm’s $\approx$2400, left arm's $\approx$2100 attractive and $\approx$1500 oscillating repulsive forces until t=330 show initial target approach with active collision avoidance. Right arm then dominates with $\approx$2300 attractive peak at t=350 while left arm maintains oscillating pattern around $\approx$1600 before dropping to $\approx$0 at t=388, indicating priority-based sequential execution. The left arm's subsequent $\approx$2000 spike at t=420 and final $\approx$500 adjustment before $\approx$50 convergence, combined with right arm's $\approx$2400-to-zero repulsive transition and $\approx$700 adjustment spike, demonstrate the three-way force equilibrium effectively managing collision avoidance, target acquisition, and stability maintenance. These coordinated force patterns enable safe dual-arm manipulation through balanced home-seeking, exponential attraction, and inverse-square repulsion, validated by smooth transitions, predictable force scaling, and clear trajectory-force correlations.
+
+Observing Fig.~\ref{Attrction_force_pattern}(b), Fig.~\ref{Repulsive_force_pattern}(b) and Fig.~\ref{final_trajec2}, analyzing the second row sub-plots represents attractive and repulsive force trends for traditional attractive-repulsive APF which represents two-way force equilibrium: Both arms show initial convergence to home position with $\approx$550 (left) and $\approx$700 (right) attractive force stabilizing to $\approx$200 until around t = 248, showing weaker position holding without home-seeking force. After target detection from vision, simultaneous high-magnitude attractive forces emerge ($\approx$2300 right, $\approx$2100 left) with $\approx$1900 repulsive force oscillations, indicating uncontrolled collision avoidance. Both arms exhibit competing behavior during t=300-350, with right right arm's $\approx$1600 attractive spike concurrent with left arm's $\approx$2000 peak, leading to unstable spatial competition. The force equilibrium deteriorates with sharp $\approx$2000 repulsive spikes and minimal damping, causing wide trajectory deviations visible in the path curves. Final phase shows multiple high-magnitude force oscillations before eventual convergence to 200 baseline, demonstrating poor stability without home-seeking influence. The trajectory plot validates these issues through excessive path curvature, wider sweeping motions during collision avoidance, and less direct approaches to targets, confirming the necessity of home-seeking force for stable dual-arm coordination.
+
+The convergence behaviors depicted in Fig.~\ref{Convergence_plot_1} and Fig.~\ref{Convergence_plot_2}, illustrate the interplay of two parallel control systems. Position trajectories are governed by the APF framework, while orientation trajectories are controlled by a PD controller. Fig.~\ref{Convergence_plot_1} demonstrates smooth convergence, attributed to the inclusion of the three-way force equilibrium that effectively mitigates oscillations and prevents excessive arm extension. Notably, orientation convergence is independently controlled and effectively synchronized with position convergence. But in Fig.~\ref{Convergence_plot_2} shows that without home attraction, position trajectories oscillate due to force antagonism between pure attraction-repulsion, while orientation still achieves convergence with PD control but experiences coupling effects from less stable positional behavior. This separation of position and orientation control allows for independent tuning of linear and angular responses while maintaining overall system stability. The sequential illustration of experiments for explaining two cases are shown in Fig.~\ref{Home_expo} and Fig.~\ref{No_Home}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusions}
+\label{conclusion}
+In this paper, we presented a comprehensive framework for dual-arm asymmetric manipulation with inter-arm collision avoidance for handling industrial components. Our approach introduces a computationally efficient collision detection method that represents manipulator links as line segments in 3D space, enabling real-time distance monitoring through analytical solutions for parallel, intersecting, and skew configurations. The integration of YOLOv8 OBB-based object detection achieves robust real-time perception at 20 frames per second with oriented bounding boxes, demonstrating high accuracy of 0.99 and 0.97 for bolt and nut detection respectively along with components size estimation. The improved Artificial Potential Field (iAPF) framework implements a novel three-way force equilibrium through exponential attractive, inverse-square repulsive, and exponential home-seeking forces, significantly enhancing trajectory stability and reducing oscillations compared to traditional APF approaches. Our hybrid twist control scheme combines iAPF-generated linear velocities with PD-controlled angular velocities, with proven stability through Lyapunov analysis and enabling precise asymmetric manipulation through a priority-based state machine. Experimental validation demonstrates the framework's effectiveness in handling challenging scenarios, including close-proximity object sorting and goal conflicts between manipulators, while maintaining safe separation distances. This integrated approach provides a promising foundation for deploying collaborative dual-arm systems in industrial settings where reliable, efficient, and safe manipulation of industrial components is essential. \textcolor{blue}{The proposed framework assumes a controlled workspace free from external dynamic obstacles, focusing primarily on inter-arm collision avoidance. The vision system is currently limited to pre-trained component classes (nuts/bolts), though it remains adaptable through retraining for new object types.}
+
+\textcolor{blue}{Future work will extend the present framework to handle external dynamic environments through: i) real-time external obstacle detection using RGB-D depth sensing to detect unknown objects in the workspace, ii) adaptive repulsive force field generation that incorporates external obstacles into the existing iAPF framework. This progression will enable deployment in unstructured manufacturing environments while maintaining the proven stability and collision avoidance capabilities demonstrated in this work. Potential applications include automated assembly of industrial components, transitioning from absolute motion to relative motion control during assembly phase, with integrated size matching and precise alignment capabilities. }
+
+\section*{Conflict of Interest Statement}
+The authors declare that the research was conducted in the absence of any commercial or financial relationships that could be construed as a potential conflict of interest.
+
+\section*{Author Contributions}
+Surya Prakash S.K: Conceptualization, Methodology, Original draft, Writing review, Editing, Visualization; Darshan Kumar: Conceptualization, Methodology, Formal analysis, Writing review, Validation; Bhuvan Narula: Methodology, Writing review, Visualization. Amit Shukla:  Conceptualization, Supervision, Writing review, Editing, Validation   
+
+\section*{Funding}
+Details of all funding sources should be provided, including grant numbers if applicable. Please ensure to add all necessary funding information, as after publication this is no longer possible.
+
+\section*{Acknowledgments}
+We would like to express our gratitude to Ravi Kiran Akumalla, Research Scholar in the Modeling \& Intelligent Control Lab, IIT Mandi, for his contribution to the Lyapunov stability proof. We also extend our appreciation to Nandini, a research intern at the Centre for Artificial Intelligence and Robotics (CAIR), IIT Mandi, for her contribution to custom data preparation.
+
+\section*{Supplemental Data}
+ Supplementary Figures are included in the \textit{$frontiers_SupplementaryMaterial.tex$} and uploaded in the supplementary material section. 
+
+\section*{Data Availability Statement}
+The datasets and codes [GENERATED/ANALYZED] for this study can be found in the [Dual-Arm-Manipulation] [\href{https://github.com/suryarobotcontrol/Dual-Arm-Manipulation.git}{GitHub}].
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliographystyle{Frontiers-Harvard}
+\bibliography{test}
+\section*{Figure captions}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\linewidth]{3D_Journal_D21077_recent(1).jpg}
+\caption{The Proposed Overall Methodology for iAPF Dual-Arm Motion Planning }\label{overall_method}
+\end{figure*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\linewidth]{Kinova_fwd_drawio.jpg}
+\caption{Kinova Gen3 Lite with Link Frames with Modified DH Parameters}\label{forward_kinematics}
+\end{figure*}
+
+\begin{table*}[h!]
+\centering
+\caption{\textcolor{blue}{Comparative analysis of the proposed iAPF with traditional and existing APF variants for industrial dual-arm manipulation}}
+\label{tbl1}
+\begin{tabular}{p{3cm}p{2cm}p{2cm}p{3cm}p{2cm}p{3cm}}
+\toprule
+\textbf{Method} & \textbf{Force Field Components} & \textbf{Stability Guarantee} & \textbf{Real-time Performance} & \textbf{Industrial Suitability} & \textbf{Key Industrial Limitations}\\
+\midrule\midrule
+Traditional APF (\citet{khatib}) & Attractive + Repulsive & None & Moderate & Low & Local minima in cluttered workspaces \\
+\midrule
+Enhanced APF (\citet{Naeem}) & Attractive + Repulsive + Sampling & Statistical (95.2\%) & Slow (9.14s) & Moderate & High computational overhead \\
+\midrule
+D-APF (\citet{D-APF}) & Exponential + Vertical Priority & None & Moderate & Low & Limited to UAV applications \\
+\midrule
+Rotating APF (\citet{LIN2025110127}) & Attractive + Rotating Repulsive & Mathematical & Moderate & Low & Single arm only, no coordination \\
+\midrule
+\textbf{iAPF (Proposed)} & \textbf{Attractive + Repulsive + Home-seeking} & \textbf{Lyapunov Proven} & \textbf{Fast (10 Hz)} & \textbf{High} & \textbf{Dynamic obstacle adaptation} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width =\linewidth]{collision_21077.jpg}
+\caption{Minimum Distance Calculation Method for Line Segments}\label{Flowchart_distance}
+\end{figure*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=0.7\linewidth]{Journal_visualization_d21077.jpg}
+\caption{Visualization of real-time minimum distance(m) calculation for Dual-Arm Links (\textit{block with with more bright and red dotted lines indicates the minimum distance})}\label{min_dist_real-time}
+\end{figure*}
+\begin{table*}[h!]
+\centering
+\caption{Systematic Evaluation of Models on Our Custom Dataset (nut/bolt) for Suitable Selection of Model}
+\label{tbl2}
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}cccc}
+\toprule%
+\textbf{S.No} & \textbf{Model Name} & \textbf{Model Size (MB)} & \textbf{Inference} \\
+\midrule
+1 & Detectron2 Instance Segmentation & 351.1 & 0.51 \\
+2 & YOLO V8 Instance Segmentation    & 20.0 & 15 \\
+3 & YOLO V11 Instance Segmentation   & 6.0 & 13 \\
+4 & YOLO V8 OBB                      &5.9 & 20 \\
+\bottomrule
+\label{deep_learning_results}
+\end{tabular*}
+\end{table*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\textwidth]{imaage_annotation.jpg}
+\caption{Data Collection(top row) and (b) Data Labeling of nuts (blue border) and bolts(red border)(bottom row).}
+\label{datacollection}
+\end{figure*}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.4\textwidth]{bolt_obb.jpeg}
+\caption{YOLOV8 Oriented bounding box predictions around the detected object.}
+\label{fig:obb}
+\end{figure}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\linewidth]{Asymmetric_Manipulation(1).jpg}
+\caption{Overall States for Dual-Arm Manipulators from Picking to Positioning the Components}\label{state_machine}
+\end{figure*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=0.8\linewidth]{new_state_machine(1).jpg}
+\caption{Priority Mechanism and Critical States for Asymmmetric Dual-Arm Manipulation}\label{Priority Mechanism}
+\end{figure*}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=\linewidth]{setup_1.jpg}
+\caption{Experiment setup to demonstrate the iAPF based motion planning for dul-arm asymmetric manipulations.}
+\label{fig:Visual_Servoing}
+\end{figure}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=\linewidth]{fina_trajec.png}
+\caption{Dual-arm end effectors' trajectories with exponential attraction, inverse distance and exponential home-seeking attraction force fields.[Both arms initiate movement from their home positions towards their respective target locations. Due to distance priority, the right arm reaches its target first, picks up the object, and then retreats to its designated drop point. While the right arm is performing these actions, the left arm remains at the transition point. Once the right arm has move away by picking the object, the left arm begins its movement towards its target. The second plot illustrates the complete trajectories of both arms.]}
+\label{final_trajec1}
+\end{figure}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=\linewidth]{final_trajec2.png}
+\caption{Dual-arm end effectors' trajectories with exponential attraction, inverse distance repulsion without exponential home-seeking attraction force fields. [Both arms initiate movement from their home positions towards their respective target locations. Due to distance priority, the left arm reaches its target first, picks up the object, and then retreats to its designated drop point. While right arm remains at the transition point. Once the left arm has move away by picking the object, the right arm begins its movement towards it target. The second plot illustrates the complete trajectories of both arms.]}
+\label{final_trajec2}
+\end{figure}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\linewidth]{Att_for_both(1).jpg}
+\caption{Convergence of attractive forces for both cases (a) with exponential home (b) without exponential home}\label{Attrction_force_pattern}
+\end{figure}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\linewidth]{Rep_for_both(1).jpg}
+\caption{Convergence of Repulsive forces for both cases Forces (a) with exponential home (b) without exponential home}\label{Repulsive_force_pattern}
+\end{figure}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\linewidth]{surya(1).jpg}
+\caption{Position and Orientation Convergence in Exponential Goal Attraction, Exponential Home Attraction and Inverse Distance Repulsion.}\label{Convergence_plot_1}
+\end{figure*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\linewidth]{yesho(1).jpg}
+\caption{Position and Orientation Convergence in Exponential Goal Attraction, Without Exponential Home Attraction and Inverse Distance Repulsion.}\label{Convergence_plot_2}
+\end{figure*}
+
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\textwidth]{With_home-exp_force_with_home.jpg}
+\caption{Sequential Illustration of Asymmetric Dual-Arm Manipulation at Near Goal Conflict situation with Clear Spatial Separation between Arms [at t = 6.25 left arm gets priority due to the proximity, t = 8.33 left arm picking the object while right arm waiting at safe transition point, t = 15.66 right arm picks the object and t = 16.32 left arm drops the object and right arm at t = 22.50.] - With Three-way Force Equilibrium.}\label{Home_expo}
+\end{figure*}
+\begin{figure*}[h!]
+\centering
+\includegraphics[width=\textwidth]{With_home-exp_force_no_home.jpg}
+\caption{Sequential Illustration of Asymmetric Dual-Arm Manipulation at Near Goal Conflict situation with Close Proximity Movement of Dual-Arm[at t = 7.33 left arm gets priority due proximity with goal, while right arm move far away from left arm due to spike in repulsion, t = 14 arms are near collision situation.] - Without Three-Way Force Equilibrium.}\label{No_Home}
+\end{figure*}
+\end{document}

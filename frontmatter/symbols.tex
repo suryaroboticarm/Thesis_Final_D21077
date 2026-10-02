@@ -1,0 +1,79 @@
+%============================= symbols.tex================================
+\cleardoublepage
+\chapter*{List of Symbols}
+\addintoc{List of Symbols}
+\makeatletter
+\@mkboth{List of Symbols}{List of Symbols}
+\makeatother
+
+Symbols used consistently for a single quantity throughout the thesis are listed once. A small
+number of symbols are, by established convention in the sub-field each chapter draws on, used for
+more than one quantity; these are listed once per meaning, tagged with the chapter(s) or appendix in
+which that meaning applies.
+
+\begin{xltabular}{\textwidth}{@{}l X l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Location} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Location} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{3}{@{}l}{\textbf{Roman Symbols}} \\
+\midrule
+$\mathbf{q}$ & Joint configuration vector of the manipulator & Ch.~4, 5, 7; App.~A \\
+$\mathbf{Q}$ & Unit quaternion representing an orientation & Ch.~4, 7; App.~A \\
+$J$ & Manipulator Jacobian & Ch.~4; App.~D \\
+$T$ & Homogeneous transformation matrix & Ch.~3--7 \\
+$R$ & Rotation matrix & Ch.~3--7; App.~A \\
+$R$ (index) & Superscript/subscript label for the RIGHT arm, paired with $L$ for LEFT & Ch.~4, 6 \\
+$\mathbf{p}$ & Cartesian position vector & Ch.~3--7 \\
+$\mathbf{v}$ & Cartesian linear velocity / twist command & Ch.~4, 6 \\
+$\mathbf{e}$ & Pose-error vector, position ($\mathbf{e}_p$) or orientation ($\mathbf{e}_o$) & Ch.~4, 6 \\
+$d$ & Scalar Euclidean distance between two points, segments, or links & Ch.~5, 6; App.~B \\
+$D$ & Chamfer-matching cost between a template and the scene & Ch.~3 \\
+$D$ & Inter-arm / inter-link distance matrix & Ch.~5, 6 \\
+$k$ & Generic index (loop, joint, or summation counter) & throughout \\
+$k_a, k_r, k_h, k_d, k_v$ & iAPF gain constants: attraction, repulsion, home-seeking, damping, velocity scaling & Ch.~6 \\
+$L$ & A line segment, $L_1, L_2$ & Ch.~5; App.~B \\
+$V$ & RL state-value function, $V_\theta(\mathbf{s})$ & Ch.~7 \\
+$N$ & A count: template points (Ch.~3), arms (Ch.~5), or rollout steps $N_{\text{steps}}$ (Ch.~7) & Ch.~3, 5, 7 \\
+$\hat{A}_t$ & Generalized Advantage Estimation advantage estimate & Ch.~7; App.~E \\
+$S$ & Centralized-critic global state (ALPHA) & Ch.~7 \\
+$\mathbf{s}$ & Local agent observation/state & Ch.~7 \\
+$\mathbf{a}$ & Policy action & Ch.~7 \\
+$r$ & Reward & Ch.~7 \\
+$\mathbf{w}$ & Vector between two line-segment start points, $\mathbf{b}_1-\mathbf{a}_1$ & Ch.~5; App.~B \\
+\multicolumn{3}{@{}l}{\textbf{Greek Symbols}} \\
+\midrule
+$\theta$ & Denavit--Hartenberg joint-angle parameter & Ch.~5; App.~A \\
+$\theta$ & End-effector orientation angle / rotation-error angle (axis-angle form) & Ch.~4, 6; App.~A \\
+$\theta$ & PPO/MAPPO policy parameters, $\pi_\theta$ (unbolded; distinct from the joint vector $\mathbf{q}$) & Ch.~7 \\
+$\delta$ & Chamfer-matching pitch angle & Ch.~3 \\
+$\alpha$ & Two-valued arm-index label, $\alpha \in \{L, R\}$ & Ch.~6 \\
+$\alpha_t^i$ & ALPHA's adaptive policy-blending gating scalar & Ch.~7 \\
+$\mu(\mathbf{q})$ & Manipulability measure, $\mu(\mathbf{q}) = \sqrt{\det(JJ^\top)}$ & Ch.~4; App.~D \\
+$\lambda$ & Damped-least-squares damping factor & Ch.~4; App.~D \\
+$\lambda$ & GAE weighting parameter & Ch.~7; App.~E \\
+$\gamma$ & RL discount factor & Ch.~7; App.~E \\
+$\eta$ & iAPF repulsive-force decay exponent & Ch.~6; App.~C \\
+$\varepsilon, \epsilon$ & A small numerical tolerance: central-difference step, line-segment classification tolerance, or PPO clip range & Ch.~4, 5, 7; App.~B, E \\
+$\rho_t$ & PPO/MAPPO policy probability ratio & Ch.~7; App.~E \\
+$\pi_\theta$ & Policy function & Ch.~7; App.~E \\
+\multicolumn{3}{@{}l}{\textbf{Other Notation}} \\
+\midrule
+$SO(3)$ & The group of 3-D rotation matrices & Ch.~4, 6; App.~A \\
+$SE(3)$ & The group of 3-D rigid-body transformations & Ch.~4, 5 \\
+$\mathbb{R}^n$ & The $n$-dimensional real coordinate space & throughout \\
+$B, C, G, F/M$ & Coordinate-frame labels: base, camera, gripper, object/fiducial-marker & Ch.~3, 4 \\
+\end{xltabular}
+
+%========================================================================
+
+%%% Local  Variables:
+%%% mode:  latex
+%%% TeX-master: "Thesis.tex"
+%%% End:

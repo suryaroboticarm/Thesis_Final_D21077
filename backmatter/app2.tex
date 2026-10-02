@@ -1,0 +1,124 @@
+%============================= app2.tex================================
+\chapter{Closed-Form Minimum Distance Between Line Segments}
+\label{app:distance}
+
+Chapter~\ref{chap:distance} states the closed-form minimum-distance formulas for parallel, skew, and
+intersecting segment pairs (Equations~\eqref{eq:dm_parallel}--\eqref{eq:dm_skew}) directly, without
+deriving them from the underlying optimization problem. This appendix supplies that derivation. Using
+the notation of Section~\ref{sec:dm_classification}, segment $L_1$ is parametrized $p(s) = a_1 +
+s\mathbf{u}$, $s\in[0,1]$, $\mathbf{u} = a_2-a_1$, and segment $L_2$ is parametrized $q(t) = b_1 +
+t\mathbf{v}$, $t\in[0,1]$, $\mathbf{v} = b_2-b_1$, with $\mathbf{w} = b_1-a_1$ and $\mathbf{c} =
+\mathbf{u}\times\mathbf{v}$ as in the main text.
+
+%% ============================================================
+\section{The Unconstrained Problem and the Skew Case}\label{sec:appB_skew}
+%% ============================================================
+
+The squared distance between a point on each segment is
+\begin{equation}
+f(s,t) = \lVert p(s)-q(t) \rVert^2 = \lVert -\mathbf{w} + s\mathbf{u} - t\mathbf{v} \rVert^2,
+\label{eq:appB_objective}
+\end{equation}
+using $p(s)-q(t) = (a_1-b_1) + s\mathbf{u} - t\mathbf{v} = -\mathbf{w} + s\mathbf{u} - t\mathbf{v}$.
+Minimizing first over $s,t \in \mathbb{R}$ (ignoring the segment endpoints for the moment) by
+setting the partial derivatives to zero,
+\begin{equation}
+\frac{\partial f}{\partial s} = 2\mathbf{u}\cdot(-\mathbf{w}+s\mathbf{u}-t\mathbf{v}) = 0, \qquad
+\frac{\partial f}{\partial t} = -2\mathbf{v}\cdot(-\mathbf{w}+s\mathbf{u}-t\mathbf{v}) = 0,
+\label{eq:appB_gradzero}
+\end{equation}
+and collecting the $s,t$ terms gives the normal equations
+\begin{equation}
+(\mathbf{u}\cdot\mathbf{u})s - (\mathbf{u}\cdot\mathbf{v})t = \mathbf{u}\cdot\mathbf{w}, \qquad
+-(\mathbf{u}\cdot\mathbf{v})s + (\mathbf{v}\cdot\mathbf{v})t = -\mathbf{v}\cdot\mathbf{w},
+\label{eq:appB_normaleqs}
+\end{equation}
+which is exactly the $2\times2$ linear system of Equation~\eqref{eq:dm_skew} in matrix form. Its
+coefficient matrix is the Gram matrix of $\mathbf{u}$ and $\mathbf{v}$, positive semi-definite by
+construction, and singular exactly when $\mathbf{u}$ and $\mathbf{v}$ are parallel, since the
+determinant $(\mathbf{u}\cdot\mathbf{u})(\mathbf{v}\cdot\mathbf{v}) - (\mathbf{u}\cdot\mathbf{v})^2$
+is zero, by the equality case of the Cauchy--Schwarz inequality, if and only if $\mathbf{v} =
+\lambda\mathbf{u}$ for some scalar $\lambda$. For the skew case, $\lVert\mathbf{c}\rVert \geq
+\varepsilon$ by definition, so $\mathbf{u}$ and $\mathbf{v}$ are not parallel, the Gram matrix is
+invertible, and Equation~\eqref{eq:appB_normaleqs} has the unique solution $(s^*, t^*)$ of Equation
+\eqref{eq:dm_skew}. Because $f$ is a convex quadratic (its Hessian is twice the same positive
+semi-definite Gram matrix), this critical point is the global minimizer of the unconstrained problem.
+
+If $s^*, t^* \in [0,1]$, the unconstrained minimizer already lies on both finite segments and is
+therefore also the constrained minimizer, giving $d_S(L_1,L_2) = \lVert p(s^*)-q(t^*) \rVert$. If
+either coordinate falls outside $[0,1]$, convexity of $f$ over the box $[0,1]^2$ implies the
+constrained minimum lies on the box's boundary, that is, with $s$ or $t$ fixed at $0$ or $1$; fixing
+one parameter reduces the two-variable problem to the one-variable problem of minimizing the distance
+from a fixed endpoint of one segment to every point on the other, a point-to-segment distance. This
+is exactly the endpoint-distance fallback used in Equation~\eqref{eq:dm_skew} and, by the identical
+argument, in the intersecting case of Section~\ref{sec:appB_intersect} below.
+
+%% ============================================================
+\section{The Parallel Case}\label{sec:appB_parallel}
+%% ============================================================
+
+When $\lVert\mathbf{c}\rVert < \varepsilon$, $\mathbf{v} = \lambda\mathbf{u}$ and the normal-equation
+system of Equation~\eqref{eq:appB_normaleqs} is singular: the two infinite lines have a continuum of
+equally close point pairs rather than a unique one, since sliding along both lines simultaneously by
+a matched amount leaves the separation unchanged. The distance between the two infinite lines is
+instead the component of $\mathbf{w}$ perpendicular to the shared direction $\mathbf{u}$,
+\begin{equation}
+d_P^{\infty} = \lVert \operatorname{proj}_{\perp}(\mathbf{w}) \rVert, \qquad
+\operatorname{proj}_{\perp}(\mathbf{w}) = \mathbf{w} - (\mathbf{w}\cdot\hat{\mathbf{u}})\hat{\mathbf{u}},
+\qquad \hat{\mathbf{u}} = \frac{\mathbf{u}}{\lVert\mathbf{u}\rVert},
+\label{eq:appB_projperp}
+\end{equation}
+obtained by subtracting from $\mathbf{w}$ its component along $\hat{\mathbf{u}}$, leaving only the
+orthogonal remainder; since $\mathbf{v} \parallel \mathbf{u}$, this remainder is simultaneously
+perpendicular to $\mathbf{v}$, so Equation~\eqref{eq:appB_projperp} is the distance between the two
+lines regardless of which of the two directions it is measured against. This is exactly
+Equation~\eqref{eq:dm_parallel}'s $\operatorname{proj}_{\perp}(\mathbf{w})$ term. Because the two
+segments have finite extent, this infinite-line distance is only realized if the segments' projected
+ranges overlap; the minimum over the actual finite segments is the smaller of
+Equation~\eqref{eq:appB_projperp} and the four endpoint distances, matching the $\min\{\cdot\}$
+construction of Equation~\eqref{eq:dm_parallel}.
+
+%% ============================================================
+\section{The Intersecting Case}\label{sec:appB_intersect}
+%% ============================================================
+
+When $\mathbf{u}$ and $\mathbf{v}$ are not parallel, $\lVert\mathbf{c}\rVert \geq \varepsilon$, the
+two infinite lines intersect if and only if they are coplanar, that is, $\mathbf{w}$ lies in the
+plane spanned by $\mathbf{u}$ and $\mathbf{v}$. The general test for coplanarity of three vectors is
+the scalar triple product,
+\begin{equation}
+[\mathbf{u},\mathbf{v},\mathbf{w}] = \mathbf{u}\cdot(\mathbf{v}\times\mathbf{w})
+= \mathbf{w}\cdot(\mathbf{u}\times\mathbf{v}) = \mathbf{c}\cdot\mathbf{w},
+\label{eq:appB_triple}
+\end{equation}
+using the cyclic identity for the scalar triple product, vanishing exactly when the three vectors
+are coplanar.
+
+The classification test actually used throughout this thesis (Section~\ref{sec:dm_classification}
+and Algorithm~\ref{alg:dm_collision}) is instead $\lVert\mathbf{c}\times\mathbf{w}\rVert <
+\varepsilon$, a vector rather than a scalar condition. Expanding it with the vector triple-product
+identity $(\mathbf{A}\times\mathbf{B})\times\mathbf{C} = \mathbf{B}(\mathbf{A}\cdot\mathbf{C}) -
+\mathbf{A}(\mathbf{B}\cdot\mathbf{C})$,
+\begin{equation}
+\mathbf{c}\times\mathbf{w} = (\mathbf{u}\times\mathbf{v})\times\mathbf{w}
+= \mathbf{v}(\mathbf{u}\cdot\mathbf{w}) - \mathbf{u}(\mathbf{v}\cdot\mathbf{w}),
+\label{eq:appB_cwtriple}
+\end{equation}
+which, since $\mathbf{u}$ and $\mathbf{v}$ are linearly independent here, vanishes if and only if
+both scalar coefficients vanish simultaneously: $\mathbf{u}\cdot\mathbf{w} = 0$ and
+$\mathbf{v}\cdot\mathbf{w} = 0$. This is the condition the implemented test actually detects, the
+connecting vector $\mathbf{w}$ between the two segments' start points is perpendicular to both
+direction vectors at once, a stricter condition than the general coplanarity test of Equation
+\eqref{eq:appB_triple}, and the one this thesis's classification and the accompanying
+implementation~\citep{sk2025distance} use throughout. Given coplanarity under either test, the
+intersection parameters solve $\mathbf{u}s - \mathbf{v}t = \mathbf{w}$ as in Equation
+\eqref{eq:dm_intersect}; if $s,t \in [0,1]$ the segments themselves intersect and
+$d_I(L_1,L_2)=0$, otherwise the nearest approach is again an endpoint distance, by the same
+boundary argument as Section~\ref{sec:appB_skew}.
+
+%========================================================================
+
+%%% Local  Variables:
+%%% mode:  latex
+%%% TeX-master: "Thesis.tex"
+%%% End:

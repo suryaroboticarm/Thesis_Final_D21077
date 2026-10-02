@@ -1,0 +1,281 @@
+\chapter{Conclusions and Future Directions}
+\label{chap:conclusion}
+
+Chapter~\ref{chap:learned_control} closed with the observation that the two studies of that chapter
+complete the progression announced in Chapter~1: perception locates a component before either arm
+can act on it, a second arm cannot be added safely before it is decided which arm acts, concurrent
+motion cannot be trusted without a continuous safety signal, that signal is only useful once a
+planner consumes it, and only with a working classical planner in place does it become possible to
+identify precisely where a hand-designed control law runs out of headroom and a learned one is
+warranted. This chapter closes the thesis itself. Section~\ref{sec:concl_bygap} revisits each of
+the seven research gaps identified in Chapter~\ref{chap:lit_review}, restating the contribution the
+corresponding study makes against it, and then, for each study, stating the limitations and the
+future directions the study's own authors identified, in the terms the original work itself used.
+Section~\ref{sec:concl_remarks} closes with brief concluding remarks on the thesis as a whole.
+
+%% ============================================================
+\section{Contributions, Limitations, and Future Directions by Research Gap}\label{sec:concl_bygap}
+%% ============================================================
+
+The eight studies of this thesis were organized in Chapter~1 around seven research gaps, G1 through
+G7, each closed by one or more of the studies. What follows revisits each gap in turn: the
+contribution restates, briefly, what Chapters~\ref{chap:vision_pipelines}
+through~\ref{chap:learned_control} already established in full; the limitations and future
+directions are drawn directly from the discussion each constituent study gives of its own scope,
+rather than from any assessment introduced in this chapter.
+
+%% ------------------------------------------------------------
+\subsection{G1: Perception for Small, Low-Feature Components}\label{sec:concl_g1}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The first study localizes overlapping bolts from RGB-D point clouds using
+    $k$-means segmentation to restrict the search volume and Oriented Chamfer matching for pose
+    estimation, with colour-based segmentation and contour analysis for size estimation, achieving
+    bolt sorting from a cluttered bin without misclassification in Gazebo
+    simulation~\citep{sk2024bolthandling}. The second study replaces classical segmentation with a
+    custom-trained DeepLabV3+ model, reaching a mean Intersection over Union of 0.95 against
+    PPLiteSeg and OCRNet baselines on a custom dataset of new and aged bolts, and fuses the resulting
+    mask with RealSense D415 depth to localize and sort bolts by size on hardware, again without
+    misclassification~\citep{sk2024boltsorting}.
+
+    \item[Limitations.] For the first study, position and size accuracy are bounded by the
+    point-cloud step size used during Chamfer matching, by the decision to ignore template scale
+    during matching, and by camera resolution, higher resolution reduced size-estimation error but
+    increased computation time; validation was limited to Gazebo simulation with bolts assumed
+    static and handled with a stock gripper~\citep{sk2024bolthandling}. For the second study, bolts
+    were likewise assumed static and handled with the in-built gripper, the pipeline was validated
+    on bolts presented singly rather than in overlapping or occluded configurations or in motion, and
+    only bolts, not nuts, were sorted~\citep{sk2024boltsorting}.
+
+    \item[Future directions.] The first study's stated future work is to optimize computational
+    efficiency through GPU acceleration and geometric descriptors, to expand the system to a more
+    diverse set of components, and to integrate the perception pipeline with a dual-arm robotic
+    system~\citep{sk2024bolthandling}, a direction the third study of this thesis subsequently takes
+    up directly. The second study's stated future work is to handle bolts in overlapping or occluded
+    configurations and in motion, to reduce sorting time using a customized gripper, and to extend
+    the pipeline to include nuts for nut-bolt assembly using a dual-arm
+    manipulator~\citep{sk2024boltsorting}, a direction the fifth study's joint bolt/nut detection and
+    the eighth study's peg-in-hole pre-assembly alignment later advance, though neither closes it as
+    the original study specifically framed it.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G2: Runtime Arm Selection from Onboard Perception}\label{sec:concl_g2}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The third study lets two Kinova Gen3 Lite manipulators, each with its own
+    wrist-mounted eye-in-hand camera, independently search a shared workspace and relay a detected
+    target's pose across a calibrated inter-arm transform, resolving which arm should act through a
+    runtime, reachability-based role-assignment rule, validated end-to-end in Gazebo/ROS2 and on
+    hardware with sub-5\,mm, sub-1.3$^\circ$ manipulation accuracy regardless of which arm is
+    assigned~\citep{sk2025sharedvision}.
+
+    \item[Limitations.] The study's own scope statement notes that its five trials per arm-selection
+    configuration establish repeatability at a proof-of-concept level rather than a fully powered
+    statistical characterization; that the reachability test is a simple axis-aligned workspace box
+    rather than a full manipulability or collision-aware reachability model; that the tie-break used
+    when a target lies in both arms' reachable workspaces is plain Euclidean distance rather than any
+    measure of manipulability or motion cost; and that role assignment is decided once, at the moment
+    of detection, the system does not monitor whether the acting arm's own view of the target remains
+    usable once manipulation begins~\citep{sk2025sharedvision}.
+
+    \item[Future directions.] The study identifies extending the protocol so that the idle arm
+    continues observing the target during the acting arm's approach, relaying a corrected pose if the
+    acting arm's own eye-in-hand view degrades mid-task, as its most direct avenue for future work,
+    moving the coordination decision from a one-time handoff to a continuously monitored one. Beyond
+    this, it identifies testing the protocol against a larger and more varied set of trials to
+    characterize failure modes more rigorously, replacing the fixed workspace-box reachability test
+    with a learned or manipulability-weighted reachability measure, and extending the single-object
+    handling demonstrated here to multi-object scheduling across the two
+    arms~\citep{sk2025sharedvision}.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G3: Sensor-Free, Real-Time Inter-Arm Distance}\label{sec:concl_g3}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The fourth study models manipulator links as line segments in 3-D space,
+    classifies their configuration as parallel, intersecting, or skew, and computes a continuous,
+    sensor-free inter-arm distance signal across sixteen collision-critical link pairs in real time
+    from forward kinematics and joint feedback alone, validated on dual Kinova Gen3 Lite manipulators
+    during twist control and integrated with a traditional artificial potential field controller to
+    demonstrate the signal's direct usability for collision
+    avoidance~\citep{sk2025distance}.
+
+    \item[Limitations.] The study states its framework assumes the shared workspace is free of
+    external obstacles, and that its practical validation is limited to dual-arm
+    systems~\citep{sk2025distance}.
+
+    \item[Future directions.] The study identifies extending the framework to multi-arm systems with
+    more than two arms and with variable degrees of freedom, and advancing collision-avoidance
+    techniques that consume the real-time distance signal for complex coordinated motions in
+    multi-arm systems, as its stated directions for future
+    work~\citep{sk2025distance}.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G4: Stable Asymmetric Dual-Arm Motion Planning}\label{sec:concl_g4}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The fifth study proposes iAPF, an improved artificial potential field
+    framework coupling exponential goal attraction, continuous inter-arm repulsion, and home-seeking
+    forces in a three-way equilibrium stabilized by velocity-dependent damping, combined with an
+    empirically validated, stable hybrid twist controller and a priority-lock coordination
+    mechanism, driven by YOLOv8 OBB detection at 20 frames per second with 0.99 and 0.97 accuracy
+    for bolts and nuts respectively~\citep{surya2025iapf}.
+
+    \item[Limitations.] The study states that its framework assumes a controlled workspace free from
+    external dynamic obstacles, focusing primarily on inter-arm collision avoidance rather than
+    general obstacle avoidance, and that its vision system is currently limited to the pre-trained
+    component classes it was trained on, nuts and bolts, though it remains adaptable to new object
+    types through retraining~\citep{surya2025iapf}.
+
+    \item[Future directions.] The study identifies extending the present framework to handle external
+    dynamic environments through real-time external obstacle detection using RGB-D depth sensing to
+    detect unknown objects in the workspace, and adaptive repulsive force field generation that
+    incorporates such external obstacles into the existing iAPF framework, enabling deployment in
+    unstructured manufacturing environments while retaining the stability and collision-avoidance
+    properties demonstrated in the study. It further identifies automated assembly of industrial
+    components as a potential application, transitioning from the absolute motion control
+    demonstrated here to relative motion control during an assembly phase, with integrated size
+    matching and precise alignment capabilities~\citep{surya2025iapf}, a direction the eighth study's
+    peg-in-hole pre-assembly alignment work subsequently advances, though by a learned rather than a
+    potential-field controller.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G5: Adaptive Task Allocation}\label{sec:concl_g5}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The sixth study replaces the fixed nut-left/bolt-right object assignment of
+    the fifth study with a distance-based competitive task allocation mechanism, in which each arm
+    evaluates object detections over a five-frame temporal proposal window before committing to a
+    runtime, distance-based selection, giving an approximately 47\% velocity improvement over fixed
+    allocation in homogeneous scenarios with zero collisions across all trials, and universal
+    object-handling capability in mixed scenarios at an approximately 11\% time
+    overhead~\citep{sk2025competitive}.
+
+    \item[Limitations.] The study's own future-work framing indicates that the demonstrated task is
+    absolute-position pick-and-sort placement rather than assembly; that the temporal window length
+    and the improved artificial potential field's force coefficients are fixed, hand-set parameters
+    rather than ones adapted to real-time workspace density or task complexity; and that validation
+    covers single-object pick assignment rather than multi-object assembly sequences of varying
+    geometric complexity~\citep{sk2025competitive}.
+
+    \item[Future directions.] The study identifies three directions for future work: extending the
+    framework to size-based assembly operations, specifically nut-bolt pairings, which necessitates a
+    transition from the absolute positioning movements demonstrated here to coordinated, relative
+    end-effector movements for precise threaded fastener insertion and bilateral manipulation;
+    implementing adaptive learning mechanisms for the dynamic adjustment of temporal window
+    parameters and artificial-potential-field force coefficients based on real-time workspace density
+    and task complexity; and expanding validation to multi-object assembly sequences of varying
+    geometric complexity to further demonstrate industrial scalability and generalization
+    capability~\citep{sk2025competitive}.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G6: Trajectory Tracking on Non-Spherical Wrists}\label{sec:concl_g6}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The seventh study presents a coupled-reward Proximal Policy Optimization
+    controller that maps instantaneous Cartesian pose error directly to joint velocity commands for
+    the Kinova Gen3 Lite's non-spherical wrist, trained purely on 1.5 million static reachable poses
+    with no trajectory supervision, generalizing zero-shot to circular, square, lemniscate, and 3-D
+    Lissajous trajectories on physical hardware, and the only method among five classical and learned
+    baselines that does not degrade from simulation to hardware~\citep{sk2025diktracking}.
+
+    \item[Limitations.] The study states that hardware validation is restricted to a single
+    manipulator, the Kinova Gen3 Lite, so generalization to other non-spherical-wrist platforms such
+    as KUKA, ABB, or UR variants with offset wrist axes is untested and the cost of porting the
+    policy to a different kinematic structure is unknown; that the policy was trained with a single
+    random seed, so the variance of the approach across independent training runs has not been
+    characterized; that hardware baseline comparison against TRAC-IK, DLS, and SAC was restricted to
+    the circular trajectory, while the proposed method was further validated on the lemniscate,
+    3-D Lissajous, and square trajectories without retraining, leaving a head-to-head hardware
+    comparison on the more complex trajectories open; that controller behaviour near kinematic
+    singularities remains uncharacterized, since the policy was not explicitly trained on
+    singularity-proximal configurations; and that, because the policy has no explicit dynamic model
+    or closed-form stability guarantee, it does not offer the formal safety guarantees available to
+    model-based controllers~\citep{sk2025diktracking}.
+
+    \item[Future directions.] The study identifies incorporating singularity-proximal configurations
+    during rollout collection to enable verified recovery behaviour at kinematic boundaries;
+    multi-seed training to quantify the variance of the proposed reward structure's accuracy and
+    smoothness advantages; extending the hardware baseline comparison to the non-circular
+    trajectories; and validating on additional non-spherical-wrist manipulators to test whether the
+    consistency observed here is specific to the Kinova Gen3 Lite or a more general property of the
+    reward design. It further identifies extending the framework to dual-arm manipulation, where the
+    learned differential inverse-kinematics controller would serve as a per-arm low-level policy for
+    coordinated bi-manual control, as a natural extension toward collaborative assembly operations
+    requiring simultaneous precise trajectory tracking under contact
+    constraints~\citep{sk2025diktracking}. The eighth study of this thesis takes up exactly this
+    direction, reusing the trained policy, frozen, as the single-arm prior inside ALPHA.
+\end{description}
+
+%% ------------------------------------------------------------
+\subsection{G7: Sample-Efficient Dual-Arm Coordination Learning}\label{sec:concl_g7}
+%% ------------------------------------------------------------
+
+\begin{description}
+    \item[Contribution.] The eighth study reuses the seventh study's trained policy, frozen, as the
+    single-arm prior inside ALPHA, an adaptive hierarchical blending architecture in which a
+    Multi-Agent PPO coordination policy, trained under Centralized Training with Decentralized
+    Execution, is combined with the frozen prior through a learned, incrementally updated gating
+    scalar co-trained with it from timestep zero, achieving 96.5\% reach and 95.0\% alignment success
+    across 4096 parallel simulation environments and 93.3\% reach with 90.0\% alignment success over
+    30 physical hardware trials of cooperative peg-in-hole pre-assembly alignment, with policy
+    inference at 200\,Hz on a CPU-only platform against the hardware's 20\,Hz control
+    loop~\citep{sk2025alpha}.
+
+    \item[Limitations.] The study's discussion states that the Kinova Gen3 Lite's non-spherical,
+    force-sensor-less gripper limits grasp verification to proximity thresholds, so any in-hand slip
+    during insertion propagates as an unobservable error into alignment; that object pose is assumed
+    known a priori, an intentional scope boundary the study describes as leaving the system not yet
+    perception-complete rather than an architectural limitation of the policy itself; that the
+    simulation's proximity-triggered snap mechanism was excluded from hardware deployment and
+    replaced with staged spatial waypoints, a deployment modification the study attributes to the
+    mismatch between simulated contact observations and hardware; and that hardware evaluation over
+    30 trials yields correspondingly wide 95\% Wilson confidence intervals, 78.7\% to 98.2\% for
+    reach and 74.4\% to 96.5\% for alignment~\citep{sk2025alpha}.
+
+    \item[Future directions.] The study identifies integrating force sensing for compliant contact
+    handling, which it notes would directly address the grasp-verification limitation without
+    requiring structural changes to the blending or reward design, since force observations could be
+    appended directly to the local and global critic states already used; integrating visual
+    perception for object pose estimation, which would make the system perception-complete without
+    modifying the learned policy or reward structure; and extending the framework to $N>2$ arm
+    configurations, which the study notes is architecturally supported by the Dec-POMDP formulation
+    already used, extension requiring only an expansion of the global state dimensionality and the
+    addition of agents to the MAPPO update, with no structural change to the blending mechanism or
+    reward design~\citep{sk2025alpha}.
+\end{description}
+
+%% ============================================================
+\section{Concluding Remarks}\label{sec:concl_remarks}
+%% ============================================================
+
+Read together, the future directions identified independently across these eight studies converge
+on a small number of recurring themes rather than eight unrelated wish-lists. Perception
+completeness recurs three times: the first study's own call to integrate with a dual-arm system, the
+second study's call to handle occluded and moving objects, and the eighth study's call to give ALPHA
+a vision front-end so that object pose is sensed rather than assumed, are each, in the terms their
+own authors used, instances of the same unfinished step. External-obstacle awareness recurs twice,
+in the fourth study's assumption of an obstacle-free shared workspace and the fifth study's identical
+assumption for the iAPF controller built on top of it, both flagged as the immediate next extension
+by their own authors. Assembly, rather than sorting, recurs three times, in the second study's wish
+to extend to nut-bolt pairs, the fifth study's proposed transition from absolute to relative motion
+control during an assembly phase, and the sixth study's identically framed call for size-based
+nut-bolt assembly, of which the eighth study's peg-in-hole pre-assembly alignment is a first,
+partial, and independently arrived-at instance. And the seventh study's own proposed extension to
+dual-arm manipulation, with the learned controller reused as a per-arm low-level policy, is precisely
+what the eighth study carries out. None of this is a plan this thesis sets out in advance; it is a
+convergence visible only in hindsight, across eight studies conducted as a single, connected
+progression from single-arm classical vision to dual-arm reinforcement learning, each addressing a
+research gap the previous study's classical or learned components left open, and each still leaving,
+in its own authors' words, a next gap of exactly the kind the following study goes on to close.

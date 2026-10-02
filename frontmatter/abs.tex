@@ -1,0 +1,69 @@
+\begin{Abstract}
+Industrial automations increasingly demands manipulation capability that a single, fixed-workspace
+robotic arm cannot provide: components must be perceived reliably even when small and
+low-textured, a second arm must be brought in once one arm's reach is exceeded, that second arm
+introduces a collision risk no single-arm system faces, and the resulting shared-workspace motion
+must be planned, allocated, and, where classical control reaches its limits, learned. This thesis
+develops that capability progressively, tracing a single arc from single-arm classical computer
+vision to dual-arm reinforcement learning across eight connected studies, each addressing a
+research gap the previous study's classical or learned components leave open, and each validated on
+a common Kinova Gen3 Lite dual-arm hardware platform.
+
+The first two studies address \textbf{perception} for small, low-textured industrial fasteners.
+The first localizes overlapping bolts from RGB-D point clouds using $k$-means segmentation and
+Oriented Chamfer matching, achieving bolt sorting from a cluttered bin without misclassification in
+Gazebo simulation. The second replaces classical segmentation with a custom-trained DeepLabV3+
+model, reaching a mean Intersection over Union of 0.95 against PPLiteSeg and OCRNet baselines, and
+fuses the resulting mask with RealSense depth to localize and sort bolts by size on hardware.
+
+The third study addresses \textbf{dual-arm coordination}: two Kinova Gen3 Lite manipulators, each
+with its own wrist-mounted eye-in-hand camera rather than a shared external sensor, independently
+search a shared workspace, relay a detected target's pose across a calibrated inter-arm transform,
+and resolve which arm should act through a runtime, reachability-based role-assignment rule,
+validated end-to-end in Gazebo/ROS2 and on hardware with sub-5\,mm, sub-$1.3^\circ$ manipulation
+accuracy regardless of which arm is assigned.
+
+The fourth, fifth, and sixth studies address \textbf{safety and motion planning} in the resulting
+shared workspace. A kinematics-based framework models manipulator links as line segments,
+classifies their configuration as parallel, intersecting, or skew, and computes a continuous,
+sensor-free inter-arm distance signal across sixteen collision-critical link pairs in real time.
+An improved artificial potential field (iAPF) framework then consumes that signal, coupling a
+three-way equilibrium of exponential attraction, continuous inter-arm repulsion, and home-seeking
+forces, stabilized by velocity-dependent damping, with a priority-lock coordination mechanism,
+and is validated first under a fixed nut-left/bolt-right
+object assignment before a distance-based competitive task allocation mechanism replaces that fixed
+assignment with a runtime, temporal-window decision, giving an approximately 47\% velocity
+improvement over fixed allocation in homogeneous scenarios with zero collisions across all trials.
+
+The seventh and eighth studies replace the classical control layer with \textbf{learned}
+controllers exactly where it reaches its limit. A coupled-reward Proximal Policy Optimization (PPO)
+controller maps instantaneous Cartesian pose error directly to joint velocity commands for the
+Kinova Gen3 Lite's non-spherical wrist, whose offset joint axes break the kinematic decoupling
+closed-form inverse kinematics depends on; trained purely on 1.5 million static reachable poses with
+no trajectory supervision, it generalizes zero-shot to circular, square, lemniscate, and 3-D
+Lissajous trajectories on physical hardware, and is the only method among five classical and
+learned baselines that does not degrade from simulation to hardware. That trained policy is then
+reused, frozen, as the single-arm prior inside \textbf{ALPHA}, an adaptive hierarchical blending
+architecture in which a Multi-Agent PPO coordination policy, trained under Centralized Training
+with Decentralized Execution, is combined with the frozen prior through a learned, incrementally
+updated gating scalar co-trained with it from timestep zero, achieving 96.5\% reach and 95.0\%
+alignment success across 4096 parallel simulation environments and 93.3\% reach with 90.0\%
+alignment success over 30 physical hardware trials of cooperative peg-in-hole pre-assembly
+alignment, with policy inference at 200\,Hz on a CPU-only platform against the hardware's 20\,Hz
+control loop.
+
+Taken together, these eight studies show that the classical and learned layers of dual-arm
+industrial manipulation are not alternatives but a single progression, in which each stage supplies
+the precondition the next requires: perception must localize a component before either arm can act
+on it, a second arm cannot be added safely before it is decided which arm acts, concurrent motion
+cannot be trusted without a continuous safety signal, that signal is only useful once a planner
+consumes it, and only with a working classical planner in place does it become possible to identify
+precisely where a hand-designed control law runs out of headroom and a learned one is warranted.
+\\
+\textbf{Keywords: -} Dual-arm manipulation, industrial automation, RGB-D perception, template
+matching, semantic segmentation, eye-in-hand vision, reachability-based role assignment,
+inter-arm collision avoidance, artificial potential fields, competitive task
+allocation, differential inverse kinematics, non-spherical wrist manipulators, proximal policy
+optimization, multi-agent reinforcement learning, sim-to-real transfer, cooperative pre-assembly
+alignment.
+\end{Abstract}

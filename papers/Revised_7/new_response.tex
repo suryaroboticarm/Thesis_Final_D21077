@@ -1,0 +1,522 @@
+\documentclass[11pt]{elsarticle}
+
+
+%================================================================
+% Packages
+%================================================================
+\usepackage[margin=1in,headheight=22pt]{geometry}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{array}
+\usepackage{textcomp}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}   % \captionof for figures/tables inside boxes
+\renewcommand{\thefigure}{R\arabic{figure}}  % response-only figures: R1, R2, ...
+\renewcommand{\thetable}{R\arabic{table}}
+\usepackage[dvipsnames,svgnames]{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{xr-hyper}                 % cross-document refs (must precede hyperref)
+\usepackage[colorlinks=true,linkcolor=NavyBlue,urlcolor=NavyBlue,citecolor=NavyBlue]{hyperref}
+
+%================================================================
+% Colour palette (single place to change the whole look)
+%================================================================
+\definecolor{editorframe}{RGB}{110,60,140}    % purple  -> Editor
+\definecolor{editorback}{RGB}{246,240,250}
+\definecolor{commentframe}{RGB}{30,60,120}    % navy    -> Reviewer comment
+\definecolor{commentback}{RGB}{236,242,250}
+\definecolor{responseframe}{RGB}{20,110,60}   % green   -> Author response
+\definecolor{responseback}{RGB}{238,248,240}
+\definecolor{topicbar}{RGB}{45,55,72}         % slate   -> Topic headings
+\definecolor{noteframe}{RGB}{190,120,20}      % amber   -> Notes / legend
+\definecolor{noteback}{RGB}{253,246,232}
+
+% Kept for backward compatibility with earlier drafts
+\definecolor{commentcolor}{RGB}{0,0,120}
+\definecolor{responsecolor}{RGB}{0,100,0}
+
+%================================================================
+% Layout
+%================================================================
+\setlength{\parskip}{0.5em}
+\setlength{\emergencystretch}{1.5em}
+\setlength{\parindent}{0pt}
+\setlist{itemsep=0.35em, topsep=0.3em, leftmargin=*}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray}Response to Reviewers}
+\fancyhead[R]{\small\color{gray}RINENG-D-26-12984}
+\fancyfoot[C]{\small\color{gray}Page \thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{gray!50}\leaders\hrule height \headrulewidth\hfill}}
+
+%================================================================
+% Box environments
+%   \begin{editorbox} ... \end{editorbox}
+%   \begin{reviewerbox}[<title>] ... \end{reviewerbox}
+%   \begin{responsebox} ... \end{responsebox}
+%================================================================
+\tcbset{
+  rrbase/.style={
+    enhanced, breakable,
+    boxrule=0pt, leftrule=3pt, arc=1pt,
+    left=8pt, right=8pt, top=5pt, bottom=5pt,
+    before skip=0.6em, after skip=0.9em,
+    fonttitle=\bfseries\small,
+    coltitle=white,
+    toptitle=2pt, bottomtitle=2pt,
+    parbox=false,
+  }
+}
+
+\newtcolorbox{editorbox}{
+  rrbase,
+  colback=editorback, colframe=editorframe,
+  title={Comments from the Editor}
+}
+
+\newtcolorbox{reviewerbox}[1][Reviewer Comment]{
+  rrbase,
+  colback=commentback, colframe=commentframe,
+  title={#1}
+}
+
+\newtcolorbox{responsebox}[1][Author Response]{
+  rrbase,
+  colback=responseback, colframe=responseframe,
+  title={#1}
+}
+
+% Topic heading: full-width slate bar (also creates a PDF bookmark)
+\newcommand{\topicheading}[1]{%
+  \par\vspace{1.2em}%
+  \phantomsection\pdfbookmark[1]{#1}{#1}%
+  \begin{tcolorbox}[enhanced, colback=topicbar, colframe=topicbar,
+      arc=1pt, boxrule=0pt, left=8pt, top=4pt, bottom=4pt,
+      before skip=0pt, after skip=0.6em]
+    {\color{white}\large\bfseries #1}
+  \end{tcolorbox}}
+
+% Reviewer heading: coloured label with rule
+\newcommand{\reviewerheading}[1]{%
+  \par\vspace{0.6em}%
+  \phantomsection\pdfbookmark[2]{#1}{#1}%
+  {\large\bfseries\color{commentframe}#1}\\[-0.6em]
+  {\color{commentframe!40}\rule{\linewidth}{0.6pt}}\par}
+
+% Optional command for pointing to revised manuscript text
+\newcommand{\revised}[1]{\textcolor{blue}{#1}}
+
+%================================================================
+% Links to the revised manuscript (labels, equations, line numbers)
+%   Compile new_revised.tex FIRST, then this file.
+%================================================================
+\externaldocument{new_revised}
+\newcommand{\mline}[1]{\textcolor{blue}{page~\pageref{#1}, line~\ref{#1}}}
+\newcommand{\mlines}[2]{\textcolor{blue}{page~\pageref{#1}, lines~\ref{#1}--\ref{#2}}}
+
+%================================================================
+\begin{document}
+%================================================================
+
+%---------------------------- Title block -----------------------
+\begin{tcolorbox}[enhanced, colback=white, colframe=topicbar, boxrule=0.8pt,
+    arc=2pt, left=10pt, right=10pt, top=8pt, bottom=8pt]
+  \begin{center}
+    {\LARGE\bfseries\color{topicbar} Response to Reviewers}
+  \end{center}
+  \vspace{0.3em}
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{@{}>{\bfseries\raggedright\arraybackslash}p{0.22\linewidth}>{\raggedright\arraybackslash}p{0.72\linewidth}@{}}
+    Manuscript Title & Continuous Trajectory Tracking for Non-Spherical Wrist Manipulator via Coupled-Reward-Driven Differential Inverse Kinematics \\
+    Authors          & Surya Prakash S.K, Sai Teja Majji, Darshankumar Prajapati, Jagannath Prasad Sahoo, Pushkar Kumar, Jayakumar V.K, Amit Shukla \\
+    Manuscript ID    & Ms.\ No.\ RINENG-D-26-12984 \\
+    Journal          & Results in Engineering \\
+  \end{tabular}
+\end{tcolorbox}
+
+%---------------------------- Legend ----------------------------
+\begin{tcolorbox}[enhanced, colback=noteback, colframe=noteframe, boxrule=0pt,
+    leftrule=3pt, arc=1pt, left=8pt, top=4pt, bottom=4pt,
+    title={Note / Colour Key}, fonttitle=\bfseries\small, coltitle=white]
+  \begin{itemize}[leftmargin=1.2em]
+    \item \textcolor{commentframe}{\textbf{Navy boxes}}: comments from the Reviewers
+          (\textcolor{editorframe}{\textbf{purple}} for the Editor).
+    \item \textcolor{responseframe}{\textbf{Green boxes}}: responses from the Authors.
+    \item All modifications in the revised manuscript are highlighted in \textcolor{blue}{blue}.
+  \end{itemize}
+\end{tcolorbox}
+
+%================================================================
+% Editor
+%================================================================
+\topicheading{Editor}
+
+\begin{editorbox}
+Reviewers have now commented on your paper. You will see that they are advising that you revise your manuscript. If you are prepared to undertake the work required, I would be pleased to reconsider my decision. For your guidance, reviewers' comments are appended below.
+\end{editorbox}
+
+\begin{responsebox}
+We sincerely thank the Editor and the Reviewers for their thorough evaluation and constructive feedback. We are encouraged by the positive reception of our work and appreciate the opportunity to improve the manuscript. Each comment has been carefully addressed through systematic revisions. Below, we provide a point-by-point response to the concerns raised, with specific references to the corresponding modifications in the revised manuscript.
+\end{responsebox}
+
+%================================================================
+% INTRODUCTION
+%================================================================
+\topicheading{Introduction}
+
+%---------------------------- Reviewer 1 ------------------------
+\reviewerheading{Reviewer 1}
+
+\begin{reviewerbox}
+The topic is meaningful, and the authors begin with the position--orientation coupling problem of non-spherical-wrist manipulators to motivate the difficulty of solving inverse kinematics for continuous trajectory tracking. The overall logic is clear. However, the discussion of conventional numerical inverse kinematics is somewhat one-sided. For example, the manuscript directly associates waypoint-by-waypoint solving with joint discontinuities, whereas practical implementations commonly use the previous joint configuration as the initial guess and introduce velocity constraints or trajectory smoothing. The relevant statements should therefore be made more objective. In addition, the proposed method is essentially a policy that generates joint velocities from the current joint state and end-effector pose error. It is not yet sufficiently explained why this method is specifically designed for non-spherical-wrist manipulators. The authors should clarify what particular requirements the kinematic coupling of a non-spherical wrist imposes on reward design; otherwise, the related claims in the title and contributions may appear overstated.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for the careful reading and for both points, which have led to substantive revisions in the \textbf{Introduction}, \textbf{Related Work}, and the \textbf{reward formulation}. The changes are included in the revised manuscript and are summarized below. 
+
+\begin{itemize}
+  \item We agree that the earlier statements were one-sided.
+
+  \begin{enumerate}
+      \item The abstract no longer asserts that waypoint-independent solving produces discontinuities incompatible with real-time loops; it now states that such solving \emph{can} produce joint-space discontinuities and that seeding, velocity limiting, and trajectory smoothing reduce but do not remove this behavior.
+      \item Related Work now discusses all three mitigations explicitly, together with the trade-off each carries and the supporting literature (Section~\ref{related work}, \mlines{ln:rw_mitig_s}{ln:rw_mitig_e}): seeding with the previous solution preserves branch continuity only while competing branches remain well separated, which a fully coupled 6-DOF problem does not guarantee near singular configurations; velocity limiting bounds the magnitude of a discontinuity but either distorts the path or, under time scaling, converts it into a speed-dependent tracking lag; and smoothing or lookahead filtering is effective for pre-planned profiles, whereas for online-determined targets only causal smoothing is available, which smooths a branch change rather than preventing it and adds a delay.
+  \end{enumerate}
+
+  %%%%%%%%%%%%
+
+  %%%%%%%%%%%%%%%
+
+  
+  \item The reported baseline already includes the suggested mitigation. 
+  \begin{enumerate}
+      \item We would also respectfully note that the TRAC-IK baseline reported in this work is seeded with its previous solution at every waypoint, that is, with exactly the practice the Reviewer describes of using the previous joint configuration as the initial guess. The reported smoothness index of 52--62 and the degradation of position RMSE from 1.2~mm on the circle to 35.3~mm on the 3-D Lissajous are therefore obtained with seeding in place, not in its absence. This is now stated explicitly in the experimental setup, together with the reason no trajectory smoothing was applied to any method (Section~\ref{sim_result}, \mlines{ln:tracik_setup_s}{ln:tracik_setup_e}). The residual claims in the manuscript are thus about the behaviour that survives standard mitigation.
+  \end{enumerate}
+  
+
+  \item The effect of kinematic coupling on reward formulation. 
+ 
+  We agree that this was asserted rather than argued, and a new paragraph has been added at the start of the reward formulation making the requirement explicit (Section~\ref{reward_function}, \mlines{ln:coupling_req_s}{ln:coupling_req_e}). For a spherical wrist, the wrist center assigns the position and orientation objectives to divide joint groups, so the objectives can be rewarded independently and an additively weighted reward is adequate. The offset wrist removes this separation, and three consequences follow, each of which maps onto one component of the proposed reward. 
+  \begin{enumerate}
+      \item First, an additively weighted pose reward is exploitable under coupling, because convergence of the better-conditioned error channel yields more reward than the residual in the other channel forfeits; the min operator (Eq.~\ref{final_pose_reward}) removes this incentive by making the reward a function of the worse channel.
+
+      \item Second, the relative sensitivity of the two channels varies with configuration, so no fixed weighting transfers across the workspace or across trajectory geometries; normalization plus min-coupling eliminates the weighting entirely.
+
+      \item Third, branch multiplicity causes a branch change to manifest as a large joint displacement that does not reduce pose error, which is penalized jointly by the asymmetric progress term (Eq.~\ref{progress_reward}) and the joint velocity penalty (Eq.~\ref{energy_penalty}). The reward ablation (Section~\ref{sec:ablation}) is consistent with this account, since the conventionally weighted variant fails on both channels, and the min-coupled variants converge on both channels once the joint velocity penalty is included.
+  \end{enumerate}
+   
+  \item Scope of the claim. 
+\begin{enumerate}
+    \item To avoid overstatement, the contribution is now explicitly scoped (\mlines{ln:scope_s}{ln:scope_e}): the architecture uses no property of the offset geometry and is not restricted to it. What is specific to the non-spherical wrist is that the coupling cannot be removed analytically, so a reward enforcing simultaneous convergence of both objectives is \emph{necessary} there, whereas for a spherical wrist the objectives separate and closed-form or decoupled solutions remain available. The title and contributions are therefore claims about where this reward design is required, not about where it is applicable. 
+\end{enumerate}  
+  
+\end{itemize}
+\end{responsebox}
+
+%---------------------------- Reviewer 2 ------------------------
+\reviewerheading{Reviewer 2}
+
+\begin{reviewerbox}
+The research gap is relevant, but the distinction between trajectory learning and reactive differential IK should be clearer. Please explain more directly why existing waypoint-based and Jacobian-based methods are insufficient for non-spherical wrist manipulators.
+
+The related work could discuss \emph{Reinforcement Learning-Driven Path Generation for Ankle Rehabilitation Robot Using Musculoskeletal-Informed Energy Optimization} to distinguish learning an optimized movement path from learning instantaneous joint-velocity commands.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the reviewer for recognizing the relevance of the research gap and for this constructive suggestion. We have revised the Related Work section as follows.
+
+\begin{itemize}
+  \item \textbf{Trajectory learning vs.\ reactive differential IK.} A new paragraph now states this distinction explicitly. One family of methods learns or optimizes the motion path itself: the output is a trajectory, optimized offline or at the planning level for a task objective and executed by a separate controller. This family includes the suggested work on reinforcement-learning-driven path generation for ankle rehabilitation, which has been cited accordingly, as well as the RRT-guided RL frameworks already discussed. The other family, to which our method belongs, is reactive differential IK. Here the reference is supplied externally and need not be known in advance, and the controller maps the instantaneous pose error and robot state to joint-velocity commands at every control step. We also note that the two families are complementary, since a learned path generator could supply the reference tracked by a reactive controller. The gap statement now explicitly positions the proposed method as reactive differential IK rather than trajectory learning (Section~\ref{related work}, \mlines{ln:rw_family_s}{ln:rw_family_e} and \mlines{ln:rw_gap_s}{ln:rw_gap_e}).
+
+  \item \textbf{Limitations of waypoint-based methods on non-spherical wrists.} For spherical-wrist manipulators, the wrist center decouples IK into independent position and orientation subproblems with closed-form solutions. The offset wrist of the manipulators such as  Kinova Gen3 Lite, removes this decoupling, so every way-point must be solved as a fully coupled 6-DOF problem with multiple solution branches. Way-points solved independently are therefore not guaranteed to remain on the same branch along a continuous path. This is consistent with the joint-space discontinuities and degraded smoothness of TRAC-IK reported in Section~\ref{results} (Section~\ref{related work}, \mlines{ln:rw_waypoint_s}{ln:rw_waypoint_e}).
+
+  \item \textbf{Limitations of Jacobian-based methods on non-spherical wrists.} Beyond requiring an accurate Jacobian at every timestep, two further difficulties are now stated. First, position and orientation errors are coupled through all six Jacobian rows. Consequently, balancing translational and rotational accuracy requires complex, geometry-specific task-weighting matrices or damping schemes, and a setting tuned for one geometry need not transfer to another. This is consistent with DLS achieving the best orientation accuracy on the circle but losing this advantage on the lemniscate. Second, singularities no longer separate into distinct arm and wrist singularities, which complicates the choice of damping. The proposed controller addresses the same differential IK problem without requiring either the analytical decoupling or an explicit Jacobian (Section~\ref{related work}, \mlines{ln:rw_jacobian_s}{ln:rw_jacobian_e}).
+\end{itemize}
+\end{responsebox}
+
+%================================================================
+% METHODS
+%================================================================
+\topicheading{Methods}
+
+%---------------------------- Reviewer 1 ------------------------
+\reviewerheading{Reviewer 1}
+
+\begin{reviewerbox}
+The methodology is generally described in sufficient detail. In particular, coupling the position and orientation errors through a minimum operator to prevent the policy from focusing on only one objective is a reasonable idea. Nevertheless, several details still require clarification. The most obvious issue concerns the construction of the reachable-pose dataset. The authors state that all six joints were sampled at 5° intervals and combined, after which collision filtering produced 1.5 million samples. Given the normal joint ranges of a six-degree-of-freedom manipulator, a complete combinatorial sweep would result in an extremely large number of configurations. The authors should therefore clarify whether exhaustive enumeration or random sampling was actually used. In addition, the so-called ``energy penalty'' only constrains joint velocity and is not equivalent to physical energy or power consumption; the terminology should be revised. The calculation of quaternion orientation error, quaternion sign consistency, episode termination conditions, and joint-limit handling should also be explained more clearly to ensure reproducibility.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for the positive assessment of the methodology and of the min-operator coupling of position and orientation errors, and for identifying the details that required clarification. Each point has been addressed as follows and include in the revised manuscript:
+
+\begin{enumerate}
+  \item \textbf{Reachable-pose dataset.} The construction procedure is now described in a dedicated subsection (Section~\ref{subsec:dataset}, Fig.~\ref{fig:dataset_flow}, \mlines{ln:dataset_s}{ln:dataset_e}). The dataset was generated by exhaustive grid enumeration rather than random sampling: each joint was discretized into 12 uniformly spaced values over its soft position limits (${\approx}28^{\circ}$ resolution), yielding $12^{6} \approx 3$~M candidate configurations. The earlier description of a $5^{\circ}$ interval was inaccurate and has been corrected. Each candidate was executed in simulation and rejected if any robot link registered non-zero contact force (self-collision or ground contact). Approximately 1.5~M configurations were retained.
+
+  \item \textbf{Terminology.} The term ``energy penalty'' has been replaced by ``joint velocity penalty'' throughout the manuscript, and the text following Eq.~(\ref{energy_penalty}) (\mlines{ln:velpen_s}{ln:velpen_e}) now states explicitly that this term is a control-effort regularization on joint velocities and does not represent mechanical energy or power consumption.
+
+  \item \textbf{Quaternion orientation error and sign consistency.} Section~\ref{reward_function} (after Eq.~(\ref{pose_errors}), \mlines{ln:quat_s}{ln:quat_e}) now specifies that all quaternions use the scalar-first convention $[w,x,y,z]$ and are expressed in the robot base frame, and that the relative orientation $\Delta\mathbf{q}_t = \mathbf{q}_\text{ee} \otimes \mathbf{q}_\text{target}^{*}$ (Hamilton product) is provided to the policy as the orientation-error observation. Since $\mathbf{q}$ and $-\mathbf{q}$ represent the same rotation, the orientation error is computed from the absolute value of the scalar part of $\Delta\mathbf{q}_t$, $\text{e}_\text{o} = 2\cos^{-1}(|\text{Re}(\Delta\mathbf{q}_t)|)/\pi$. This makes it invariant to quaternion sign and bounds the rotation angle to $[0,\pi]$, so that $\text{e}_\text{o} \in [0,1]$. All reported orientation metrics use the same sign-invariant angle in radians, i.e., before normalization by $\pi$.
+
+  \item \textbf{Episode termination.} Section~\ref{simulation} (\mlines{ln:term_s}{ln:term_e}) now states that episodes terminate only on time-out after 600 steps (10~s at 60~Hz). No early termination on success, joint-limit contact, or collision is applied, so the policy is exposed to the full episode, including holding the pose after convergence.
+
+  \item \textbf{Joint-limit handling.} Section~\ref{simulation} (\mlines{ln:term_s}{ln:term_e}) now states that the reward contains no explicit joint-limit term. Joint position limits are enforced by the PhysX articulation solver from the limits defined in the robot model, and joint-limit awareness enters training through the reachable-pose dataset, which is restricted to configurations within the soft joint limits. In addition, the Sim-to-Real section now clarifies that velocity clipping bounds only command magnitude and does not by itself guarantee safety at joint limits (Section~\ref{sim2real}, \mlines{ln:clip_s}{ln:clip_e}).
+\end{enumerate}
+\end{responsebox}
+
+%---------------------------- Reviewer 2 ------------------------
+\newpage
+\reviewerheading{Reviewer 2}
+
+\begin{reviewerbox}
+The policy receives pose error but not desired Cartesian velocity. Please explain how it anticipates a moving target rather than simply reacting to accumulated error, particularly when the trajectory speed increases.
+
+Equation (10) penalizes squared joint velocity, so it represents control effort rather than physical energy. The authors may consider \emph{Transformer-Based Approach for Predicting Transactive Energy in Neurorehabilitation} when clarifying the difference between velocity regularization and actual energy exchange.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the reviewer for this insightful comment, which has helped us state the operating principle and scope of the proposed controller more precisely.
+
+\begin{itemize}
+  \item \textbf{Anticipation of a moving target.} The policy receives neither the desired Cartesian velocity nor any observation history. It is a reactive state-feedback law acting on the instantaneous pose error, and it does not explicitly anticipate target motion. We have made this explicit in a new paragraph, ``Tracking of moving targets'' (Section~\ref{sim2real}, \mlines{ln:moving_s}{ln:moving_e}). There we explain that tracking proceeds as a sequence of short-horizon pose-reaching problems. At every control step the reference is resampled, and the policy drives the current error toward zero. As in classical resolved-rate control without a feedforward term, this error-driven feedback is expected to produce a bounded tracking lag that scales approximately with $v/K$, where $v$ is the reference speed and $K$ is the effective closed-loop gain. At the evaluated speed (15~mm/s), the reference advances by only $\approx$0.25~mm per step in simulation (60~Hz) and $\approx$0.75~mm per step on hardware (20~Hz). Each step therefore remains close to the static reaching problem on which the policy was trained. The asymmetric progress reward (Eq.~(\ref{progress_reward})) penalizes every step in which the error grows, which favors a high effective gain and hence a small lag. Regarding increasing trajectory speed, we now state explicitly that the lag is expected to grow with speed until the commanded joint velocities approach their bounds, beyond which bounded tracking cannot be maintained. Characterizing this limit is identified as future work. So is extending the observation with the reference velocity or a short preview of upcoming waypoints to enable anticipatory tracking; both have been added to the Future Work section (\mlines{ln:future_s}{ln:future_e}). We have also clarified in the experimental setup that no compared method, including the classical baselines, is provided with the desired Cartesian velocity. The comparison is therefore made under identical reference information (Section~\ref{sim_result}, \mlines{ln:sameinfo_s}{ln:sameinfo_e}).
+
+  \item \textbf{Eq.~(\ref{energy_penalty}) as control effort.} We agree. As also addressed in our response to the preceding comment, the term has been renamed the ``joint velocity penalty'' throughout the manuscript. The text following Eq.~(\ref{energy_penalty}) (\mlines{ln:velpen_s}{ln:velpen_e}) now states explicitly that it acts as a control-effort (action) regularization on the commanded joint velocities and does not represent mechanical energy or power consumption.
+
+We thank the reviewer for the suggestion of the reference. The distinction is now drawn explicitly after Eq.~(\ref{energy_penalty}) (\mlines{ln:velpen_s}{ln:velpen_e}): our term is a velocity regularization, in contrast with energy-based formulations that model physical energy exchange, such as the transactive energy formulation for physical human--robot interaction in the suggested work, which has been cited accordingly.
+\end{itemize}
+\end{responsebox}
+
+%================================================================
+% RESULTS
+%================================================================
+\topicheading{Results}
+
+%---------------------------- Reviewer 1 ------------------------
+\reviewerheading{Reviewer 1}
+
+\begin{reviewerbox}
+The inclusion of both simulation and physical experiments is one of the valuable aspects of the study. The results indicate that the proposed method performs relatively consistently across different trajectories and shows some advantage in terms of joint-motion smoothness. However, several issues in the results section require careful checking. First, SAC-D and SAC-S are not used consistently across the figure captions, tables, and main text. The manuscript later attributes SAC's tracking error to a conflict between the entropy term and the velocity penalty. This explanation would not be valid if the sparse-reward version was actually used. Second, the smoothness index is repeatedly emphasized as a key performance metric, but its definition and unit are not provided, making the corresponding results difficult to verify. Moreover, both the reinforcement-learning training and the hardware experiments appear to report only single-run results without repeated trials or uncertainty ranges. Therefore, the conclusion that hardware performance does not degrade relative to simulation is premature. The implementation details and parameter settings of TRAC-IK, DLS, and QP should also be reported more clearly to ensure that the baseline comparison is fair.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for the positive assessment and for the careful checking of the results. Each point has been addressed as follows.
+
+\begin{enumerate}
+  \item \textbf{SAC-D versus SAC-S.} The SAC policy used in every tracking evaluation, in simulation and on hardware, is SAC-S, the better-performing variant in training. This is now stated explicitly (\mlines{ln:seeds_s}{ln:seeds_e}), and the label SAC-S is used consistently in all tables and text.
+
+  \item \textbf{Explanation of the SAC tracking error.} We agree that the earlier explanation did not apply to SAC-S and have replaced it. The sparse reward, previously undefined, is now defined in full (\mlines{ln:sparse_s}{ln:sparse_e}): it is constant once the errors are inside a tolerance of 4~cm and 0.1~rad. SAC-S's errors, $\approx$2.9~cm and $\approx$0.051~rad on all three curves, lie inside this tolerance, where the policy gains nothing by reducing the error further; this is consistent with an offset that is independent of trajectory geometry (\mlines{ln:sacexp_s}{ln:sacexp_e}). The related hardware and conclusion statements have been revised accordingly.
+
+  \item \textbf{Smoothness index.} The smoothness index is now defined in Eq.~(\ref{eq:smoothness}) as the root-mean-square joint angular acceleration, in rad/s$^{2}$ (\mlines{ln:smooth_s}{ln:smooth_e}); see also our response to Comment~R1.6.
+
+  \item \textbf{Repeated runs.} The proposed policy has been trained with three independent seeds (42, 100, 200). All three converge to the same plateau (Fig.~\ref{fig:seed_curves}), and each was evaluated on all three trajectories (Tab~\ref{tab:seed_results}); both are now in the manuscript (\mlines{ln:sparse_s}{ln:sparse_e}, \mlines{ln:seeds_s}{ln:seeds_e}). The core findings hold for every seed: position RMSE stays within a narrow band across geometries, and on the 3-D Lissajous every seed (11.1--17.2~mm) outperforms all baselines (27.9--35.3~mm). Where the seed spread weakened a claim, it has been moderated: the smoothness advantage is now stated for the mean, with the proposed method comparable to Velocity QP on the Lissajous (\mlines{ln:smoothclaim_s}{ln:smoothclaim_e}). The classical baselines are deterministic and evaluated once; TRPO-D and SAC-S remain single-seed, stated as a limitation (\mlines{ln:limseed_s}{ln:limseed_e}).
+
+  \item \textbf{Hardware conclusion.} We agree that this conclusion was premature. The hardware platform is no longer available for further trials, so the claim has been moderated throughout to state that, in the trials conducted, the hardware position error of the proposed method on the circle did not exceed its simulation error (9.95~mm in simulation, 6.3~mm on hardware), whereas that of every hardware baseline increased; its orientation RMSE rose moderately, from 0.0265 to 0.0320~rad, which is now also stated explicitly (\mline{ln:hwsingle}, \mline{ln:concl_hw}). The Limitations section now states that each hardware result is a single reported trial (\mlines{ln:limseed_s}{ln:limseed_e}).
+
+  \item \textbf{Baseline implementation.} The complete implementation of TRAC-IK, DLS, and Velocity QP, including control laws, parameters, solver settings, and the conversion of the TRAC-IK joint solution into a joint velocity command, is now given in Table~\ref{tab:baselines} of the revised manuscript; the per-method action scales, tuned once on the circle and then frozen, are listed in Tab~\ref{tab:error_metrics_sim}. TRAC-IK was executed in Gazebo under ROS~1 on the same reference trajectories, which is now stated (\mlines{ln:seeds_s}{ln:seeds_e}). The description of Velocity QP has also been corrected: it is a single quadratic program solved with OSQP at every step with joint-velocity bounds (\mlines{ln:qp_s}{ln:qp_e}).
+\end{enumerate}
+\end{responsebox}
+
+%---------------------------- Reviewer 2 ------------------------
+\reviewerheading{Reviewer 2}
+
+\begin{reviewerbox}
+The reward ablation is limited to the circular trajectory and apparently one training seed. Please report multi-seed statistics and repeat the ablation on a varying-orientation trajectory such as the 3-D Lissajous path.
+
+All hardware experiments use a relatively low trajectory speed of \(0.1\)~rad/s. Please evaluate several speeds and report how tracking error and smoothness change under the 20~Hz control frequency.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for these suggestions. The changes are highlighted in blue.
+
+\begin{enumerate}
+  \item \textbf{Ablation on a varying-orientation trajectory.} All four reward variants have been evaluated on the 3-D Lissajous in addition to the circle, and the results are reported in a new table with position RMSE, orientation RMSE, and smoothness for both curves (Tab~\ref{tab:ablation}, \mlines{ln:abl_s}{ln:abl_e}). The ranking is preserved: without the joint velocity penalty, variants (a) and (b) fail on both curves; adding it reduces position RMSE to 12--18~mm; and the progress term further improves position on both curves and orientation on the Lissajous (0.053 to 0.044~rad), where the orientation demand is higher.
+
+  \item \textbf{Multi-seed statistics.} The full reward (d) is the proposed PPO-D policy, which has now been trained with three seeds and evaluated on all trajectories (Tab~\ref{tab:seed_results}). Variants (a)--(c) were not retrained; since the position RMSE of (a) and (b) is roughly an order of magnitude larger (7--20$\times$), their ranking relative to (c) and (d) is not sensitive to seed variation. This is stated as a limitation (\mlines{ln:limseed_s}{ln:limseed_e}).
+
+  \item \textbf{Trajectory speed at 20~Hz.} The hardware platform is no longer available for further trials, so additional hardware speeds could not be run. Instead, the proposed method has been evaluated in simulation at 0.05, 0.1, 0.2, and 0.3~rad/s on all three trajectories (Tab~\ref{tab:speed}, \mlines{ln:speed_s}{ln:speed_e}). Tracking remains bounded up to three times the nominal speed; position RMSE grows approximately linearly with speed, roughly doubling from 0.1 to 0.3~rad/s, and the smoothness index rises more steeply. The simulation-only, 60~Hz nature of this evaluation is stated as a limitation (\mlines{ln:limabl_s}{ln:limabl_e}).
+\end{enumerate}
+\end{responsebox}
+
+%================================================================
+% DISCUSSION
+%================================================================
+\topicheading{Discussion}
+
+%---------------------------- Reviewer 1 ------------------------
+\reviewerheading{Reviewer 1}
+
+\begin{reviewerbox}
+The discussion attempts to explain the experimental observations from the characteristics of the different algorithms, and the content is relatively comprehensive. However, some explanations go beyond what is directly supported by the current experiments. For example, the authors attribute PPO's smoothness to its clipping mechanism, SAC's residual error to the maximum-entropy objective, and the lower hardware error to actuator damping and action noise. Although these interpretations are plausible, they remain speculative because they have not been verified through dedicated ablation studies. The central claim of the manuscript is that reward design is more important than algorithm selection. However, the reward settings, training budgets, and final tested versions are not fully consistent across algorithms, so this conclusion should be stated more cautiously. The authors are advised to reduce strong causal statements and present them instead as possible explanations consistent with the observed results. Additional experiments involving multiple random seeds, action-noise ablation, different control frequencies, and different trajectory speeds would further strengthen the discussion.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this balanced assessment and agree that several earlier statements asserted causality where the experiments supported only correlation. The discussion has been revised accordingly.
+
+\begin{enumerate}
+\item \textbf{Speculative mechanisms.} We have moderated these claims, presenting them instead as hypotheses consistent with our empirical observations while explicitly noting the absence of isolating ablations. This applies to PPO's clipped update (\mlines{ln:clipexp_s}{ln:clipexp_e}), the maximum-entropy objective for SAC-D in training (\mlines{ln:sacd_s}{ln:sacd_e}), and the actuator damping effect on hardware (Section~\ref{sim2real}). (Note that the SAC-S tracking offset is now explained directly by the mathematical tolerance of its sparse reward, as detailed in our response regarding the Results section). Action noise is now described strictly in terms of improving robustness to command perturbations.
+
+\item \textbf{Reward versus algorithm.} We agree that the evidence was overstated, and the central claim has been carefully rescoped (\mlines{ln:claim_s}{ln:claim_e}, \mline{ln:concl_claim}). The evidence supports the proposed reward as necessary rather than strictly sufficient: using the same optimizer, the sparse reward fails (PPO-S); and using the same dense reward and budget, TRPO-D converges to a lower return. Therefore, the successful result is now attributed to the combination of the proposed reward formulation and a stable on-policy optimizer, a conclusion fully supported by the training curves.
+
+\item \textbf{Additional experiments.} Because the physical hardware platform is no longer available, two of the requested experiments have been added in simulation. (i) \emph{Multiple seeds:} The proposed policy was trained across three independent seeds and evaluated on all trajectories (Fig.~\ref{fig:seed_curves}, Tab.~\ref{tab:seed_results}). (ii) \emph{Trajectory speed:} The proposed method was evaluated at velocities ranging from 0.05 to 0.3~rad/s across all three curves (Tab.~\ref{tab:speed}, \mlines{ln:speed_s}{ln:speed_e}). Bounded tracking is maintained up to three times the nominal speed, with position RMSE growing approximately linearly. This aligns perfectly with the tracking-lag argument introduced in Section~\ref{sim2real}. The omission of control-frequency and action-noise ablations is now explicitly stated as a limitation (\mlines{ln:limabl_s}{ln:limabl_e}).
+\end{enumerate}
+\end{responsebox}
+
+%---------------------------- Reviewer 2 ------------------------
+\reviewerheading{Reviewer 2}
+\begin{reviewerbox}
+The claim that action noise explains the successful sim-to-real transfer is too strong because latency, backlash, payload variation, and actuator dynamics were not randomized. This conclusion should be moderated or supported by additional robustness tests. Velocity clipping does not guarantee safety near singularities, joint limits, or unexpected contact. The discussion could refer to \emph{Quantum Driven Dynamic Passivity-Based Neuromechanical Control for Wrist Rehabilitation Robot} when comparing the proposed approach with passivity-based safety control.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the reviewer for this important comment and agree with both points. The manuscript has been revised accordingly.
+
+\begin{itemize}
+  \item \textbf{Sim-to-real attribution.} We agree that attributing the transfer to action noise alone was too strong. All statements describing the action noise as domain randomization have been revised. The noise is now described only as improving robustness to perturbations of the commanded joint velocities, and the manuscript states explicitly that latency, backlash, payload variation, and actuator dynamics were not randomized. The noise description is revised in Section~\ref{rollout} (\mlines{ln:noise_s}{ln:noise_e}), and the hardware results section (Section~\ref{real_time_deployment}, \mlines{ln:s2r_s}{ln:s2r_e}) now attributes the transfer to several factors acting together:
+  \begin{enumerate}[label=(\roman*)]
+    \item the policy is a closed-loop reactive controller that re-reads the measured state at every step, so residual model mismatch is corrected continuously rather than accumulated;
+    \item the action and observation interfaces are identical in simulation and on hardware, and the joint drive stiffness and damping parameters of the simulated robot were calibrated against the physical Kinova Gen3 Lite, by applying identical constant joint-velocity commands in simulation and on hardware and tuning the drive parameters until the resulting end-effector trajectories matched (this calibration procedure is now described in Section~\ref{simulation}, \mlines{ln:calib_s}{ln:calib_e});
+    \item the action noise provides robustness to command perturbations; and
+    \item the evaluated regime of low-speed, unloaded, non-contact tracking keeps latency, backlash, and payload effects small.
+  \end{enumerate}
+  We also note, as partial evidence of robustness to timing mismatch, that the policy trained at 60~Hz was deployed at 20~Hz without retraining. The conclusion has been moderated to state that the sim-to-real result is established for the tested operating regime. Randomization of latency, backlash, payload, and actuator parameters has been added to Future Work (\mlines{ln:future_s}{ln:future_e}).
+
+  \item \textbf{Safety of velocity clipping.} We agree. The manuscript no longer describes clipping as a safety bound. It now states that clipping limits only command magnitude and does not by itself guarantee safety near kinematic singularities, at joint limits, or under unexpected contact, and that joint position limits in simulation are enforced by the physics solver rather than by the policy. The Limitations section has been extended accordingly (Section~\ref{sim2real}, \mlines{ln:clip_s}{ln:clip_e}; Section~\ref{conclusion}, \mlines{ln:limits_s}{ln:limits_e}).
+
+  \item \textbf{Passivity-based safety control.} We thank the reviewer for the suggestion. The Limitations section now contrasts the proposed approach with passivity-based control, which monitors energy exchange to maintain stable and safe physical interaction and thus offers guarantees that velocity clipping does not. The suggested work is cited there (Section~\ref{conclusion}, \mlines{ln:limits_s}{ln:limits_e}). An external safety layer, such as a control-barrier-function or passivity-based safety filter, has been added to Future Work (\mlines{ln:future_s}{ln:future_e}).
+\end{itemize}
+\end{responsebox}
+
+%================================================================
+% REVIEWER 1 — POINT-BY-POINT COMMENTS
+%================================================================
+\topicheading{Reviewer 1 --- Point-by-Point Comments}
+
+%---------------------------- R1.1 ------------------------------
+\begin{reviewerbox}[Comment R1.1]
+The research problem addressed in this manuscript is meaningful, and the study includes both simulation and hardware validation. Training the policy using static reachable poses and directly applying it to continuous trajectory tracking is somewhat novel. However, several key issues still need to be clarified, and the current content is insufficient to support the main conclusions of the manuscript.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for the positive assessment of the problem formulation and of the combination of simulation and hardware validation, and for identifying the issues that required clarification. All points raised have been addressed in the revised manuscript, and the claims have been scoped to what the experiments support. In particular, the construction of the reachable-pose dataset is now described in full (Comment~R1.3), the smoothness index is defined (Comment~R1.6), the reward terminology has been corrected (Comment~R1.4), the SAC variant used in each experiment is stated consistently and its tracking offset re-explained (Comment~R1.5), the implementation of every classical baseline is reported (Comment~R1.8), multi-seed results and a trajectory-speed evaluation have been added, and the mechanistic explanations are now presented as interpretations consistent with the observed results rather than as verified causal conclusions (Comments~R1.7 and~R1.9). The central claim regarding reward design has also been restated more cautiously (Comment~R1.10), and the generalization claim has been scoped to the tested conditions (Comment~R1.11). We believe the revised manuscript now supports its conclusions, and we detail each change in the responses below.
+\end{responsebox}
+
+%---------------------------- R1.2 ------------------------------
+\begin{reviewerbox}[Comment R1.2]
+The proposed controller essentially generates joint velocity commands from the joint states and end-effector pose errors, and a similar framework could also be applied to other serial manipulators. The authors should explain more clearly what specific requirements the kinematic coupling of a non-spherical wrist imposes on reward design and why the proposed method is particularly suitable for this type of manipulator.
+\end{reviewerbox}
+
+\begin{responsebox}
+We agree that this required an explicit argument, and we have added one; please see also our response to the Reviewer's comment on the Introduction. The requirement is now stated at the start of the reward formulation (Section~\ref{reward_function}, \mlines{ln:coupling_req_s}{ln:coupling_req_e}). On a spherical wrist, the wrist centre assigns the position and orientation objectives to disjoint joint groups, so they can be rewarded independently and an additively weighted reward is adequate. The offset wrist removes this separation, and three consequences follow, each mapping onto one reward component: an additively weighted pose reward becomes exploitable, since converging the better-conditioned channel yields more reward than the residual in the other forfeits, which the min operator (Eq.~(\ref{final_pose_reward})) removes; the relative sensitivity of the two channels varies across the workspace, so no fixed weighting transfers, which normalization and min-coupling eliminate; and branch multiplicity makes a branch change appear as a large joint displacement that does not reduce pose error, which the progress term (Eq.~(\ref{progress_reward})) and the joint velocity penalty (Eq.~(\ref{energy_penalty})) jointly penalize. The reward ablation on both the circle and the 3-D Lissajous is consistent with this account (Tab~\ref{tab:ablation}). We have also scoped the claim explicitly (\mlines{ln:scope_s}{ln:scope_e}): the architecture uses no property of the offset geometry and is not restricted to it; what is specific to the non-spherical wrist is that the coupling cannot be removed analytically, so this reward is \emph{required} there, whereas for a spherical wrist the objectives separate and closed-form or decoupled solutions remain available.
+\end{responsebox}
+
+%---------------------------- R1.3 ------------------------------
+\begin{reviewerbox}[Comment R1.3]
+The generation process of the 1.5 million reachable-pose samples is not clearly described. The manuscript states that all six joints were sampled at 5° intervals and that all joint combinations were subjected to collision filtering. For a six-degree-of-freedom manipulator, the total number of possible combinations would be extremely large. Please clarify whether exhaustive enumeration, random sampling, or another sampling strategy was actually used, and provide the initial number of candidate samples, the collision-filtering criteria, and the final number of retained samples.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this careful observation. We have revised the description to precisely reflect the implemented procedure, and moved it to a dedicated subsection (Section~\ref{subsec:dataset}, Fig.~\ref{fig:dataset_flow}, \mlines{ln:dataset_s}{ln:dataset_e}). The dataset was generated by exhaustive grid enumeration rather than random sampling: each joint was discretized into 12 uniformly spaced values over its soft position limits (${\approx}28^{\circ}$ resolution), yielding $12^{6} = 2{,}985{,}984 \approx 3~M$ candidate configurations. Each candidate was executed in simulation from the home configuration using joint position targets, and was rejected if any robot link registered non-zero contact force (self-collision or ground contact) at any step of the motion. Approximately 1.5~M configurations (${\approx}50\%$) were retained, and their settled end-effector poses in the robot base frame form the training target set, sampled uniformly at every episode reset. The git-hub repository now updated with the code used for this dataset generation.
+\end{responsebox}
+
+%---------------------------- R1.4 ------------------------------
+\begin{reviewerbox}[Comment R1.4]
+The term ``energy penalty'' is not sufficiently accurate. The corresponding reward term only penalizes the squared joint velocity commands and does not represent mechanical energy or power. It is recommended that this term be replaced with ``joint velocity penalty,'' ``action magnitude penalty,'' or ``action regularization term.''
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the reviewer for this precise observation and fully agree. The term in Eq.~(\ref{energy_penalty}) penalizes only the sum of squared commanded joint velocities and has no relation to mechanical energy or power. We have therefore renamed it the ``joint velocity penalty'' consistently throughout the revised manuscript. This covers the Abstract, Highlights, Contributions, the reward formulation section (including the subsection heading and the reward symbol, now $r_{vel}$ in Eqs.~(\ref{energy_penalty}) and (\ref{total_sum})), the discussion of training behavior, the reward ablation study and the caption of Fig.~\ref{fig:action_magnitude}, the baseline analysis, and the Conclusion. Related phrasing such as ``entropy--energy trade-off'' has also been revised to ``entropy--velocity-penalty trade-off''. In addition, we added a sentence after Eq.~(\ref{energy_penalty}) (\mlines{ln:velpen_s}{ln:velpen_e}) stating that this term acts as an action regularization on the commanded joint velocities and does not model mechanical energy or power consumption.
+\end{responsebox}
+
+%---------------------------- R1.5 ------------------------------
+\begin{reviewerbox}[Comment R1.5]
+The use of SAC-D and SAC-S is inconsistent across the figure captions, tables, and main text. The later explanation concerning the conflict between SAC's maximum-entropy objective and the velocity penalty is only applicable to SAC-D using the full reward. The authors should clearly identify which SAC version was used in each experiment.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for identifying this inconsistency; please see also our response to the Reviewer's comment on the Results section. The SAC policy used in every tracking evaluation, in simulation and on hardware, is the sparse-reward variant SAC-S, selected because it attained the higher terminal training reward; SAC-D appears in the training comparison only. This is now stated explicitly (\mlines{ln:seeds_s}{ln:seeds_e}), and the label SAC-S is used consistently in the figure captions, tables, and text. The Reviewer is also correct that the earlier explanation did not apply to the variant actually evaluated, and it has been replaced. The sparse reward, which was previously undefined, is now given in full (\mlines{ln:sparse_s}{ln:sparse_e}): it is constant once both error channels are inside a tolerance of 4~cm and 0.1~rad. SAC-S settles at $\approx$2.9~cm and $\approx$0.051~rad on all three curves, inside that tolerance, where the reward provides no incentive to reduce the error further; this is consistent with an offset that is essentially independent of trajectory geometry (\mlines{ln:sacexp_s}{ln:sacexp_e}). The corresponding statements in the hardware section and the conclusion have been revised.
+\end{responsebox}
+
+%---------------------------- R1.6 ------------------------------
+\begin{reviewerbox}[Comment R1.6]
+The smoothness index is an important evaluation metric in this study, but its mathematical definition, unit, and calculation procedure are not provided. Without this information, readers cannot properly interpret the reported values or reproduce the results. A clear mathematical expression should be added to the methodology section.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this comment. The smoothness index is now explicitly defined in Eq.~(\ref{eq:smoothness}) (Section~\ref{sim_result}, \mlines{ln:smooth_s}{ln:smooth_e}) as the root-mean-square joint angular acceleration, computed by finite differencing the joint velocities logged at every control step over all six joints, and is reported in rad/s$^{2}$ (lower is smoother).
+\end{responsebox}
+
+%---------------------------- R1.7 ------------------------------
+\begin{reviewerbox}[Comment R1.7]
+The reinforcement learning results appear to be based on only one random seed, and the hardware experiments may also have been conducted only once. Multiple independent training runs and repeated hardware trials are recommended. The results should be reported as mean values with standard deviations or confidence intervals to improve the statistical reliability of the conclusions.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this recommendation; please see also our response to the Reviewer's comment on the Results section. The proposed policy has now been trained with three independent seeds (42, 100, and 200). All three converge to the same reward plateau (Fig.~\ref{fig:seed_curves}), and each resulting policy was evaluated on all three simulated trajectories, with per-seed values and the mean $\pm$ sample standard deviation reported in Tab~\ref{tab:seed_results} (\mlines{ln:seeds_s}{ln:seeds_e}). The findings hold across seeds: the position RMSE of the proposed method remains within a narrow band across geometries, and on the 3-D Lissajous every seed (11.1--17.2~mm) outperforms all baselines (27.9--35.3~mm). Where the seed spread weakened a claim, the claim has been moderated rather than retained: the smoothness advantage is now stated for the mean, with the proposed method comparable to Velocity QP on the Lissajous (\mlines{ln:smoothclaim_s}{ln:smoothclaim_e}). The classical baselines are deterministic under identical initial conditions and are therefore evaluated once, which is now stated explicitly.
+
+Regarding repeated hardware trials, we agree, and we regret that these cannot be provided: the robot used for the reported experiments is no longer available to us, so no further hardware runs could be performed during the revision. We have therefore moderated every claim that relied on a single trial, stating only that, in the trials conducted, the hardware position error of the proposed method on the circle did not exceed its simulation error (9.95~mm in simulation, 6.3~mm on hardware), whereas that of every hardware baseline increased; its orientation RMSE rose moderately, from 0.0265 to 0.0320~rad, which is now also stated explicitly (\mline{ln:hwsingle}, \mline{ln:concl_hw}). The Limitations section now states that each hardware result is a single reported trial and that run-to-run variance on hardware has not been characterized (\mlines{ln:limseed_s}{ln:limseed_e}). The TRPO-D and SAC-S baselines and the reward ablation variants (a)--(c) likewise remain single-seed, which is stated in the same place.
+\end{responsebox}
+
+%---------------------------- R1.8 ------------------------------
+\begin{reviewerbox}[Comment R1.8]
+The implementation details of the baseline methods remain insufficient. The authors should provide the complete control formulations, gains, velocity limits, solver parameters, and parameter-tuning procedures for TRAC-IK, DLS, and QP. In particular, it should be explained how the joint-position solutions generated by TRAC-IK were converted into control commands that are comparable with those of the velocity-level methods.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this request; please see also our response to the Reviewer's comment on the Results section. The complete implementation of all three classical baselines is now reported in a dedicated table (Tab~\ref{tab:baselines}, \mlines{ln:seeds_s}{ln:seeds_e}). DLS and Velocity QP share the pose error $\mathbf{e}=[\Delta\mathbf{p};\,\phi\hat{\mathbf{u}}]$, where $\phi\hat{\mathbf{u}}$ is the axis-angle form of $\mathbf{q}_\text{target}\otimes\mathbf{q}_\text{ee}^{*}$, and the same Jacobian, obtained by finite differencing of the forward kinematics ($\delta=10^{-4}$~rad) and recomputed at every control step. DLS commands $\dot{\boldsymbol{\theta}}=\mathbf{J}^{\top}(\mathbf{J}\mathbf{J}^{\top}+\lambda^{2}\mathbf{I})^{-1}\mathbf{e}$ with $\lambda=0.05$ and unity Cartesian gain. Velocity QP solves a single quadratic program at every step with explicit joint-velocity bounds of $1$~rad/s and regularization $\lambda=10^{-3}$, using OSQP with absolute and relative tolerances of $10^{-4}$, at most 1000 iterations and solution polishing enabled, and issues a zero command if the solver does not converge; the earlier description of this baseline as sequential quadratic programming with joint-limit constraints was inaccurate and has been corrected (\mlines{ln:qp_s}{ln:qp_e}). TRAC-IK uses the Distance solve type with tolerance $\epsilon=10^{-5}$ and the default 5~ms timeout, is executed in Gazebo under ROS~1 on the same reference trajectories, is re-seeded with its previous solution at every waypoint, and holds the previous solution if a solve fails (\mlines{ln:tracik_setup_s}{ln:tracik_setup_e}).
+
+Regarding the comparability of TRAC-IK with the velocity-level methods, its joint-position solution is converted into a joint velocity command as $\dot{\boldsymbol{\theta}}=(\boldsymbol{\theta}_\text{IK}-\boldsymbol{\theta})/\Delta t$ with $\Delta t=0.034$~s, where $\boldsymbol{\theta}$ is the measured joint configuration, so that all methods drive the robot through the same joint velocity interface and differ only in how that velocity is computed. Finally, the parameter-tuning procedure is stated: the per-method action scale $a_\text{scale}$ was tuned once on the circular trajectory, to equalize each method's native output magnitude against the robot's velocity limits, and then frozen and applied identically to all remaining trajectories; the resulting values are listed in Tab~\ref{tab:error_metrics_sim}. No post-hoc trajectory smoothing or lookahead filtering was applied to any method.
+\end{responsebox}
+
+%---------------------------- R1.9 ------------------------------
+\begin{reviewerbox}[Comment R1.9]
+Some mechanistic explanations in the discussion remain speculative. For example, the manuscript attributes PPO's smoothness to the clipping mechanism, SAC's steady-state error to entropy regularization, and the lower hardware error to actuator damping and action noise. Unless these explanations are supported by dedicated ablation studies, they should be presented as possible interpretations rather than experimentally verified causal conclusions.
+\end{reviewerbox}
+
+\begin{responsebox}
+We agree with the Reviewer and have revised each of these statements; please see also our response to the Reviewer's comment on the Discussion. All three are now presented as interpretations consistent with the observed results, with an explicit note that they were not isolated by a dedicated ablation. PPO's smoothness is now attributed to its clipped update only as one possible explanation (\mlines{ln:clipexp_s}{ln:clipexp_e}). For SAC, the training-stage statement regarding SAC-D is now phrased as consistent with, though not proof of, a conflict between the maximum-entropy objective and the joint velocity penalty (\mlines{ln:sacd_s}{ln:sacd_e}); the steady-state offset of SAC-S in tracking is no longer attributed to entropy regularization at all, but to the tolerance of its sparse reward, within which the reward is constant and the measured errors lie (\mlines{ln:sacexp_s}{ln:sacexp_e}). The hardware result is no longer said to be aided by actuator damping as an established cause, but as a possible contribution that was not tested in isolation, and the action noise is described only as improving robustness to perturbations of the commanded joint velocities rather than as domain randomization (\mlines{ln:noise_s}{ln:noise_e}). Related causal phrasings elsewhere in the discussion have been softened in the same way, for example ``the proximate cause of'' to ``plausibly underlies''. An action-noise ablation would require retraining and, for its principal claim, further hardware trials, which the unavailability of the robot prevents; this is now stated as a limitation (\mlines{ln:limabl_s}{ln:limabl_e}).
+\end{responsebox}
+
+%---------------------------- R1.10 -----------------------------
+\begin{reviewerbox}[Comment R1.10]
+The manuscript repeatedly emphasizes that the performance improvement mainly results from the reward function rather than the reinforcement learning algorithm itself. However, the reward settings, training budgets, and final evaluated versions are not fully consistent across the compared algorithms. Therefore, this conclusion is not yet sufficiently supported. PPO, TRPO, and SAC should be compared under consistent reward settings, training budgets, and evaluation conditions.
+\end{reviewerbox}
+
+\begin{responsebox}
+We agree that the original claim was stronger than the evidence supports, and it has been restated (\mlines{ln:claim_s}{ln:claim_e}, \mline{ln:together}, \mline{ln:concl_claim}). The revised formulation is that the proposed reward is \emph{necessary} rather than sufficient, and that the reported behaviour follows from the reward combined with a stable on-policy optimizer, rather than from the reward alone. This is now consistent with the training-stage discussion, which already concluded that neither the reward structure nor the algorithm alone determines performance.
+
+On the consistency of the comparison, we would note the following, which is now stated in the manuscript. The clean comparisons are those in which a single factor varies. With the reward and training budget held identical ($\approx5\times10^{8}$ timesteps, full dense reward), PPO-D and TRPO-D differ only in the optimizer, and TRPO-D converges to a lower terminal reward; the algorithm therefore matters. With the optimizer held identical, PPO-D and PPO-S differ only in the reward, and the sparse variant fails; the reward therefore also matters. Taken together, these support the necessity claim rather than a claim that the algorithm is irrelevant. For SAC, we agree that the comparison is not matched: SAC-D was trained with the full dense reward under a larger budget ($\approx9\times10^{8}$ timesteps, Tab~\ref{tab:wallclock}) and still underperformed, so the budget difference does not favour the proposed method, but the variant evaluated in tracking is SAC-S, which differs in reward as well. This is now stated explicitly, together with which variant was used in each experiment (\mlines{ln:seeds_s}{ln:seeds_e}), and the SAC comparison is explicitly identified in the revised claim as differing in both reward and budget. A fully matched retraining of all three algorithms under a single reward and budget was not feasible within the revision period, and this is stated as a limitation (\mlines{ln:limabl_s}{ln:limabl_e}).
+\end{responsebox}
+
+%---------------------------- R1.11 -----------------------------
+\begin{reviewerbox}[Comment R1.11]
+The claim of ``zero-shot generalization to arbitrary continuous trajectories'' is overstated. The current experiments cover only a limited number of trajectory types, motion speeds, and workspace regions. The conclusion should be restricted to the trajectories and conditions actually tested in this study, unless additional experiments involving different speeds, scales, initial configurations, and workspace locations are provided.
+\end{reviewerbox}
+
+\begin{responsebox}
+We agree and have restricted the claim. The phrase ``arbitrary trajectory tracking'' no longer appears: the abstract and the gap statement now refer to the continuous trajectories evaluated here (\mlines{ln:scopeclaim_s}{ln:scopeclaim_e}), and the highlights and contributions enumerate the four geometries explicitly (circle, square, lemniscate, 3-D Lissajous) rather than claiming arbitrary trajectories. The conditions actually tested are now enumerated in the Limitations section, namely four geometries at a single scale and workspace region, reference speeds of 0.05--0.3~rad/s in simulation and 0.1~rad/s on hardware, and a fixed initial configuration, with an explicit statement that generalization to other scales, workspace regions, and initial states has not been tested (\mlines{ln:scopecond_s}{ln:scopecond_e}). Of the factors the Reviewer lists, trajectory speed has been evaluated during this revision: the proposed method was tested at 0.05, 0.1, 0.2, and 0.3~rad/s on all three simulated curves, where tracking remains bounded up to three times the nominal speed and position RMSE grows approximately linearly with speed (Tab~\ref{tab:speed}, \mlines{ln:speed_s}{ln:speed_e}). Scale, workspace location, and initial configuration were not varied, as the hardware platform is no longer available and we prefer to restrict the claim rather than extend it on simulation evidence alone; these are identified as future work.
+\end{responsebox}
+
+%---------------------------- R1.12 -----------------------------
+\begin{reviewerbox}[Comment R1.12]
+The manuscript should also be carefully checked for formatting and file-integrity issues, including the absence of quantitative results for the square trajectory in the hardware experiments, inconsistent symbols and method names, cross-reference errors, and the LaTeX compilation log appended to the end of the PDF.
+\end{reviewerbox}
+
+\begin{responsebox}
+We thank the Reviewer for this careful check. The manuscript has been revised as follows.
+
+\begin{enumerate}
+  \item \textbf{Square trajectory on hardware.} In the original submission, the hardware table reported the circle as the single constant-orientation case, since it is the trajectory shared with the simulation comparison and with the hardware baselines. The square was an additional trajectory evaluated only on hardware, as a further test of generalization; it was not part of the simulation comparison and was therefore shown only qualitatively (Fig.~\ref{real_trajec_const_orientation}(b)). As suggested, its quantitative results are now reported in Table~\ref{tab:error_metrics_real}: a position RMSE of 0.0079~m and an orientation RMSE of 0.0334~rad.
+
+  \item \textbf{Method names.} Method names are now identical in all tables, figure captions, and the text: TRAC-IK, DLS, Velocity QP, TRPO-D, SAC-S, and PPO-D (previously ``Trac-IK'', ``Vel QP'', ``TRPO'', and ``PPO'' in Tables~\ref{tab:error_metrics_sim} and~\ref{tab:error_metrics_real}, and ``DLS Pseudo Inverse Jacobian'' in Figs.~\ref{fig:plots_comparison} and~\ref{fig:plots_comparison_2}). The reward-ablation variants are named identically in the text, figure captions, and Table~\ref{tab:ablation}.
+
+  \item \textbf{Symbols and units.} Bold $\mathbf{q}$ is now used only for quaternions; joint positions and velocities are denoted $\boldsymbol{\theta}$ and $\dot{\boldsymbol{\theta}}$ throughout, including Table~\ref{tab:baselines}, where the axis-angle error is now written $\phi\hat{\mathbf{u}}$. The policy output is written $\dot{\boldsymbol{\theta}}_\text{p}$ consistently, the reward index in Eq.~(\ref{advantage}) now matches Eq.~(\ref{total_sum}), and Eq.~(\ref{position_error_reward}) uses $10^{-8}$. It is now stated that reported orientation errors are in radians, i.e., before the normalization by $\pi$ used in the reward (\mlines{ln:quat_s}{ln:quat_e}). Units are now given in every table header, with position errors in m and orientation errors in rad in all tables.
+
+  \item \textbf{Cross-references.} References that pointed to the wrong section or table have been corrected: the reward ablation (Section~\ref{sec:ablation}), the reachable-pose dataset (Section~\ref{subsec:dataset}), and the training budget (Table~\ref{tab:wallclock}). Hard-coded section numbers have been replaced by references, duplicate table labels removed, and the reference style unified (Section, Table, and parenthesized equation numbers). Float placement has been corrected so that all tables appear in numerical order within their own sections, rather than after the references.
+
+\end{enumerate}
+\end{responsebox}
+
+\end{document}

@@ -1,0 +1,599 @@
+\chapter{Literature Review}
+\label{chap:lit_review}
+
+This chapter reviews the literature underpinning the four themes established in Chapter~1.
+Section~\ref{sec:lit_perception} covers perception for industrial components, spanning pose
+estimation, template matching, semantic segmentation, and size estimation from RGB-D information.
+Section~\ref{sec:lit_dualarm} covers dual-arm manipulation and the coordination, motion planning and task-allocation strategies that shared workspaces demand. Section~\ref{sec:lit_collision} covers collision detection and distance computation, and Section~\ref{sec:lit_planning} the motion planning methods that consume those distances. Section~\ref{sec:lit_ik} covers inverse kinematics for manipulator control, and Section~\ref{sec:lit_rl} reinforcement learning for single-agent and multi-agent manipulation. Section~\ref{sec:lit_gaps} consolidates the gaps that motivate the work of this thesis.
+
+%% ============================================================
+\section{Perception for Industrial Component Handling}\label{sec:lit_perception}
+%% ============================================================
+
+Recent advancements in computer vision techniques have garnered significant attention from
+researchers, leading to substantial contributions in the fields of object detection and object pose
+estimation. This section traces that progress as it bears on the specific problem of small, low-textured industrial components such as nuts and bolts.
+
+%% ------------------------------------------------------------
+\subsection{Object Detection and 6D Pose Estimation}\label{subsec:lit_pose}
+%% ------------------------------------------------------------
+
+Early work established that stereo geometry alone can recover object pose in clutter.
+\citet{sumi2002object} used stereo vision to determine the 6-DOF pose of an object placed in a
+cluttered scene, even when undergoing occlusion, demonstrating good accuracy in estimating the pose
+and improving recognition rates. Their work nonetheless faces challenges related to computational
+complexity and is limited to certain lighting conditions. Learned approaches subsequently improved robustness. \citet{hu2018segmentation} introduced a segmentation-driven approach for 6D pose estimation. By predicting 2D keypoint locations for visible object parts and combining them using confidence scores, the method achieved robust pose estimation and demonstrated state-of-the-art performance on challenging datasets such as Occluded-LINEMOD and YCB-Video. Its reliance on accurate segmentation, and its potential sensitivity to occlusions and initial conditions, remain limitations.
+
+Surface texture is a crucial feature for object recognition, but many industrial components lack
+distinctive textural patterns, which is the central difficulty in this domain.
+\citet{wohlhart2015learning} proposed learning descriptors using a CNN to address this challenge.
+Their approach demonstrated potential for recovering pose information but carried high computational
+complexity and a strong reliance on the dataset. Moreover, the method's robustness was compromised
+by lighting variation, occlusions, and background clutter, all of which affect descriptor
+accuracy. \citet{back2020segmenting} proposed a synthetic data generation pipeline together with an RGB-D Fusion Mask R-CNN to address the segmentation of texture-less industrial components. By randomizing textures in the synthetic data, the focus shifted to shape-based features, and a confidence map estimator enhanced the model's ability to exploit depth information for improved segmentation. While this approach demonstrated promising results, the reliance on synthetic data for training raises concerns about domain adaptation to real-world scenarios. Self-supervised methods for segmentation and data extraction have also been developed for downstream tasks such as robotic grasping, although developing such deep learning models is extensive and time-consuming.
+
+Shape-based object segmentation can be advantageous in scenarios with poor figure-ground contrast or
+illumination, as demonstrated by \citet{borenstein2006shape}. While such a framework performs well
+on the shapes it has been trained on, its ability to generalize to completely unseen shapes may be
+limited. \citet{wohlkinger2011shape} instead viewed the classification task as a matching problem,
+introducing a method that identifies similar 3D models from comparable viewpoints by analyzing
+specific surface features. Although the method incorporates inter-view similarity, it may still
+struggle with extreme variations in viewpoint. Objects viewed from angles significantly different
+from those in the training set might not be matched accurately. The approach may also have
+limitations in handling severe occlusions, where significant parts of the object are not visible in
+the depth image, which affects the accuracy of matching and classification.
+
+\begin{table}[htbp]
+\centering
+\caption{Object detection and 6D pose estimation approaches for low-textured components.}
+\label{tab:lit_pose}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Approach} & \textbf{Principle} & \textbf{Reported limitation} \\
+\midrule
+\citet{sumi2002object}        & Segment-based stereo vision      & Computational cost, lighting-dependent \\
+\citet{hu2018segmentation}    & Segmentation-driven 2D keypoints & Depends on accurate segmentation, occlusion-sensitive \\
+\citet{wohlhart2015learning}  & CNN descriptor learning          & High cost, dataset reliance, clutter-sensitive \\
+\citet{back2020segmenting}    & RGB-D fusion + synthetic data    & Domain adaptation to real scenes \\
+\citet{borenstein2006shape}   & Shape-guided segmentation        & Limited generalization to unseen shapes \\
+\citet{wohlkinger2011shape}   & Inter-view shape matching        & Extreme viewpoint change, severe occlusion \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+%% ------------------------------------------------------------
+\subsection{Template Matching and Bin Picking}\label{subsec:lit_template}
+%% ------------------------------------------------------------
+
+Most bin-picking applications have utilized the concept of matching a template of the expected
+object in the scene to estimate its 3D pose, as this is simpler and does not require any previously
+trained models. This methodology can be preferable in industry because the CAD models used as
+templates are typically already available for the components being
+handled.
+
+\citet{liu2012fast} addressed fast object localization and pose estimation in heavy clutter for
+robotic bin picking, establishing that pose hypotheses can be generated and verified efficiently
+enough for industrial cycle times. \citet{guo2020fast} developed a fast and robust bin-picking
+system for densely piled industrial objects, targeting precisely the dense-pile regime in which
+individual instances heavily occlude one another. \citet{nguyen2022templates} revisited templates
+for 3D object pose estimation, demonstrating generalization to new objects and robustness to
+occlusions, and thereby showing that the template paradigm remains competitive with learned
+alternatives when generalization to unseen instances is required. The practical difficulty is that conventional template matching searches the entire sample space to find a suitable pattern, which is
+computationally expensive. Restricting the search volume using a prior segmentation of the RGB image
+is what makes the approach tractable in practice~\citep{sk2024bolthandling}.
+
+%% ------------------------------------------------------------
+\subsection{Semantic Segmentation Architectures}\label{subsec:lit_segmentation}
+%% ------------------------------------------------------------
+
+Object segmentation is a fundamental technique in computer vision, aiming to partition an image into
+distinct regions based on the class or category to which each pixel belongs. There are two ways to
+achieve segmentation, instance segmentation and semantic segmentation~\citep{yin2022bridging}.
+Instance segmentation would classify all bolts within a cluttered image and assign a unique colour
+and label to each individual bolt, whereas semantic segmentation would classify the bolts and assign
+a single label and colour to all bolts in the image. Where the objective is to sort components by
+size rather than to distinguish individual instances, a unique label per object is not required, and
+using semantic segmentation simplifies the process and reduces computational
+complexity. \citet{mo2022review} give a comprehensive review of classical 2D image segmentation models based on deep learning. Encoder-decoder CNN architectures have performed best for classical image segmentation. \citet{long2015fully} introduced fully convolutional networks, establishing that
+classification architectures could be adapted to dense per-pixel prediction.
+\citet{noh2015learning} proposed a deconvolution network that learns the upsampling path explicitly
+rather than relying on fixed interpolation. \citet{ronneberger2015unet} introduced U-Net, whose skip
+connections between encoder and decoder preserve spatial detail that pooling would otherwise
+discard, and the DeepLab family extended this line with atrous convolution and spatial pyramid
+pooling for multi-scale context. Alongside these, PPLiteSeg with its STDC~I and~II backbones provides lightweight CNN architectures designed for real-time applications in resource-constrained environments, trading a measure of accuracy for inference speed. OCRNet leverages an object-contextual representation approach, demonstrating the potential benefits of exploring techniques beyond classical CNN-based architectures by explicitly modeling the relationship between a pixel and the object region it belongs to. The comparative evaluation of these families on a custom
+industrial dataset, rather than on general-purpose benchmarks, is what determines which is
+appropriate for a given component-handling task.
+
+\begin{table}[htbp]
+\centering
+\caption{Semantic segmentation architecture families relevant to industrial component handling.}
+\label{tab:lit_seg}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Architecture} & \textbf{Key idea} & \textbf{Trade-off} \\
+\midrule
+FCN~\citep{long2015fully}            & Dense per-pixel prediction from classifiers & Coarse boundaries \\
+DeconvNet~\citep{noh2015learning}    & Learned upsampling path                     & Added parameters \\
+U-Net~\citep{ronneberger2015unet}    & Encoder-decoder skip connections            & Memory for high resolution \\
+DeepLab family~\citep{chen2018encoder}                        & Atrous convolution, pyramid pooling         & Heavier inference \\
+PPLiteSeg (STDC~I/II)~\citep{peng2022pp}                 & Lightweight real-time backbone              & Accuracy traded for speed \\
+OCRNet~\citep{yuan2020object}                               & Object-contextual representation            & Beyond-CNN complexity \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+%% ------------------------------------------------------------
+\subsection{Size Estimation from RGB-D Information}\label{subsec:lit_size}
+%% ------------------------------------------------------------
+
+Size estimation from 2D segmented images, leveraging classical vision techniques, is the component
+that converts a segmentation into an actionable physical measurement. \citet{omahony2020deep} compared traditional classical vision methods with deep learning methods, highlighting the advantages of integrating both approaches and explaining how the combination can
+enhance computer vision perception, leading to more robust and accurate results. Classical vision
+techniques such as markers, edge detection, corner detection, and contour detection may not be
+reliable for all situations. Under varying light conditions, shapes, and colors these methods can
+under perform at localization, consequently resulting in faulty localization and size
+estimation.
+
+Deep-learning-based object detection can estimate object size from bounding box dimensions and
+aspect ratio with some success, as demonstrated using RGB-D cameras for size
+estimation~\citep{wang2017tree}. Applying classical vision to a deep-learning-based
+\emph{segmentation} instead provides more accurate object boundaries than direct bounding boxes,
+which leads to accurate size estimation and eliminates the influence of background clutter on the
+measurement. This distinction matters for small components, where a bounding box drawn around an elongated, obliquely oriented bolt encloses a substantial fraction of background, and any dimension inferred from that box inherits the error. Deep learning has also been applied more broadly to industrial inspection, where anomaly detection in visual data supports quality control alongside the component-handling tasks considered here~\citep{shukla2025anomaly}.
+
+%% ============================================================
+\section{Dual-Arm Manipulation and Coordination}\label{sec:lit_dualarm}
+%% ============================================================
+
+Dual-arm manipulators, mirroring bi-manual human configurations, have drawn attention for sorting
+and object-transport applications~\citep{smith2012dual,makris2017dual}. Coordination between them
+has been achieved by exchanging real-time kinematic data~\citep{ortenzi2018dual}, by sharing goal
+configurations over a wireless link, or by relying on a global motion-capture system for centralized
+spatial tracking~\citep{sk2025sharedvision}. Dual-arm systems can replace human workers in existing workspaces designed for bi-manual manipulation without requiring redesign~\citep{sk2025distance}. They have been proposed across a range of industrial scenarios, including complex welding tasks~\citep{gan2019multi}, agricultural harvesting~\citep{sepulveda2020robotic}, and peg-in-hole assembly with dexterous hands~\citep{lee2022peg}.
+
+%% ------------------------------------------------------------
+\subsection{Control-Level Coupling}\label{subsec:lit_coupling}
+%% ------------------------------------------------------------
+
+Early work coupled the arms at the control level, with both acting on one shared object.
+\citet{uchiyama1988symmetric} proposed a symmetric hybrid position/force control scheme for the
+coordination of two robots, in which workspace force, velocity and position vectors are symmetric
+functions of both arms' joint-space quantities, so that neither arm dominates. The leader-follower
+alternative instead commands one arm's trajectory directly and derives the second arm's motion to
+accommodate it, and these and related hybrid and adaptive variants are surveyed by
+\citet{caccavale2025cooperative} and \citet{smith2012dual}. Throughout this line of work,
+coordination concerns how two arms move together on the same object, not which arm should
+act.
+
+\citet{abbas2023systematic} provide a systematic review of cooperative dual-arm manipulators
+covering modelling, planning, control, and vision strategies, and \citet{makris2021cooperative}
+categorizes cooperative manipulation into non-coordinated manipulations, where the manipulators move
+independently executing different tasks, and coordinated manipulations, involving combined movements
+with spatial and temporal synchronization in a shared workspace. Coordinated manipulation divides
+further into symmetric, with mirror movements and equal force distribution, and asymmetric, with
+complementary movements and different force distributions. Although more challenging, asymmetric
+manipulation enables a wider range of complex tasks that require coordinated
+actions~\citep{surya2025iapf}. Learned approaches to the same coupling problem have also appeared. \citet{alles2022learning} address learning to centralize dual-arm assembly, and \citet{zhang2025imagebased} develop image-based visual servoing for enhanced cooperation of dual-arm manipulation. More recently, \citet{chen2026vlmsfd} propose a vision-language-model-assisted flow diffusion framework for dual-arm cooperative manipulation. Eye-in-hand vision is well established for single-arm pick-and-place~\citep{nguyen2025vision}, and dual-arm systems have been used for perception-intensive tasks such as cooperative 3D model acquisition~\citep{kobayashi2022obtaining}, although there the sensing comes from a stationary external depth sensor rather than each arm's own wrist camera. In neither case is a second arm's camera used to decide which arm should manipulate a shared target.
+
+%% ------------------------------------------------------------
+\subsection{Task Allocation in Multi-Robot and Dual-Arm Systems}\label{subsec:lit_allocation}
+%% ------------------------------------------------------------
+
+Efficient task allocation in robot systems enhances overall performance and resolves workspace
+reachability constraints. \citet{khamis2015multi} review the state of the art in multi-robot task
+allocation, and \citet{korsah2013comprehensive} provide a comprehensive taxonomy for the problem.
+\citet{alatartsev2015robotic} survey the closely related robotic task sequencing problem, and
+\citet{keshvarparast2024collaborative} review collaborative robots in manufacturing and assembly
+systems together with a future research agenda. \citet{pedersen2016robot} address the translation of
+robot skills for manufacturing from concept to industrial deployment, and \citet{patra2024online}
+develop online capability-based task allocation of cooperative manipulators.
+
+Market-based task allocation methods have emerged as a prominent distributed approach, in which
+robots bid for tasks based on their reachability and current
+states~\citep{quinton2023market,galati2023auction}. \citet{fazal2022task} proposed a dynamic
+threshold-based system using adaptive incentive value computation with sequential single-item
+auctions and MiniSum/MiniMax optimization. However, centralized incentive computation and continuous
+system-wide resource tracking create computational bottlenecks unsuitable for real-time
+applications. \citet{braquet2021greedy} proposed a greedy coalition auction algorithm for spatially
+distributed multi-agent systems, enabling dynamic task reassignment as agents move toward targets
+through decentralized bid negotiations, and \citet{schneider2015auction} examine auction-based
+allocation for multi-robot teams in dynamic environments. Round-robin task allocation provides
+computational simplicity and straightforward assignment, but fails to account for task complexity
+and spatial conflict handling, leading to suboptimal utilization in spatially constrained
+workspaces~\citep{alirezazadeh2024survey}.
+
+Recent learning-based approaches employ deep reinforcement learning for adaptive task allocation and
+have shown promise in multi-robot coordination~\citep{cui2024task, hao2024coordinated}, with DRL approaches achieving better performance than heuristic baselines through end-to-end policy
+optimization~\citep{ma2024end,lu2024reinforcement}. These methods primarily address spatially
+distributed scenarios in which robots operate in large-scale workspaces such as warehouses and
+agricultural fields, learning task-scheduling decisions from abstract state representations such as
+resource availability, geometric proximity, and task priorities. Centralized formulations schedule
+tasks based on robots' current positions, predetermined target distances, and battery states, while
+decentralized DQN-based approaches learn to make run, transfer, or postpone decisions from local
+resource usage and task priority, notably excluding physical task locations or multi-robot spatial
+relationships~\citep{gautier2020comparison}. Moreover, these learning-based methods require
+extensive offline training and intensive iterations before taking a decision compared with reactive
+methods.
+
+In dual-arm systems, task allocation presents unique challenges due to shared workspace constraints,
+kinematic coupling, and the need for coordinated bilateral manipulation in industrial environments.
+\citet{behrens2019constraint} cast simultaneous task allocation and motion scheduling for industrial
+dual-arm cells as a constraint program, jointly optimizing task order and arm assignment under
+precedence and timing constraints. \citet{hamasaki2023autonomous} employed a three-layered
+A*/anytime-A* architecture with constraint-based conflict resolution and stepwise rescheduling for
+online disruptions. While achieving good performance in structured construction tasks, the
+multi-layer planning architecture and constraint resolution approach may not be optimal for
+high-frequency object detection scenarios requiring immediate proximity-based allocation decisions.
+\citet{rodriguez2016combining} proposed hybrid motion and task planning using AND/OR manipulation
+task graphs with motion planner feedback. While providing systematic solutions through backtracking
+search, the approach requires complete workspace knowledge and pre-computation of grasp
+configurations, making it unsuitable for dynamic real-time environments.
+\citet{kimmel2016scheduling} addressed dual-arm coordination using coordination diagrams with batch
+and incremental methods for task assignment. Although computationally efficient, both approaches
+assume known object placements and require collision-free trajectory pre-computation, limiting
+applicability to vision-based dynamic scenarios.
+\citet{qin2024onlinemulti} address online task allocation and scheduling in multi-manipulator
+systems under collision constraints and unknown tasks, and \citet{zacharias2007capturing} address
+the assignment question at the design stage by building reachability and capability maps that
+support a static, offline division of the workspace into per-arm zones.
+
+\begin{table}[htbp]
+\centering
+\caption{Task allocation strategies for multi-robot and dual-arm systems.}
+\label{tab:lit_allocation}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Strategy} & \textbf{Mechanism} & \textbf{Reported limitation} \\
+\midrule
+Market-based~\citep{quinton2023market}   & Bidding on reachability and state & Centralized bottlenecks \\
+Auction~\citep{braquet2021greedy}        & Decentralized bid negotiation      & Convergence under churn \\
+Threshold~\citep{fazal2022task}          & Adaptive incentive value           & System-wide resource tracking \\
+Round-robin~\citep{korsah2013comprehensive} & Fixed cyclic assignment         & Ignores spatial conflict \\
+Constraint program~\citep{behrens2019constraint} & Joint order and assignment & Offline, needs full model \\
+Layered A*~\citep{hamasaki2023autonomous} & Search with rescheduling          & Not for high-frequency detection \\
+Coordination diagrams~\citep{kimmel2016scheduling} & Incremental search       & Assumes known object placement \\
+Deep RL~\citep{ma2024end}                & End-to-end policy                  & Extensive offline training \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+%% ============================================================
+\section{Collision Detection and Distance Computation}\label{sec:lit_collision}
+%% ============================================================
+
+Industrial automation adopted multi-arm manipulator systems driven by the need for fast production,
+and researchers focused on the development of collision detection methods as multi-arm robotic
+systems emerged as a critical research area. Collision detection studies in robotics have ranged
+from geometric methods to learning-based methods.
+
+%% ------------------------------------------------------------
+\subsection{Geometric Methods}\label{subsec:lit_geometric}
+%% ------------------------------------------------------------
+
+\citet{jimenez2001collision} presented a comprehensive review of collision detection methods in 3D
+space, and \citet{lin1993efficient} established foundational techniques for efficient collision
+detection in animation and robotics. \citet{gilbert1988fast} introduced a fast procedure for
+computing the distance between complex objects in three-dimensional space, a formulation whose
+acceleration continues to attract attention~\citep{montaut2024gjk}. \citet{redon2005fast} addressed
+fast continuous collision detection for articulated models, extending the problem from discrete
+configurations to continuous motion between them.
+
+\citet{lumelsky1985fast} introduced a parameter-based algorithm for minimum distance calculation
+between line segments in $n$-dimensional space. Using parameters that range over the unit interval
+for points lying inside the segments, the method establishes a framework handling all geometric
+configurations. It first calculates the minimum distance between infinite lines by minimizing a
+quadratic function, then verifies whether these points lie within the actual segments. By using
+parameter values to identify the relevant endpoints, computational complexity reduces to $5n+12$
+multiplications and $8n+1$ additions. However, it provides only discrete collision detection without
+continuous distance metrics, limiting its application in modern control approaches requiring
+gradient information for smooth motion planning.
+
+Subsequent geometric work refined the primitives. Collision detection approaches using minimum
+distance functions defined by Euclidean norms determine collision risk between robot arms by
+modeling robot links as cylinders with hemispheres and the end-effector as spheres, then
+calculating distances between these primitives in three scenarios, line segment to line segment,
+line segment to point, and point to point~\citep{chang1990collision}. Hierarchical geometric collision detection algorithms for dual-arms have combined bounding boxes, joint-joint distance thresholds, perpendicular distance calculations, and cross-product methods~\citep{lee2001real}. Despite a 30\% computational improvement, such schemes used simplified primitives, lacked mathematical formalism for complex configurations, and provided only discrete binary detection without continuous metrics for smooth planning. These approaches showed reduced accuracy with near-parallel links and increased complexity in 3-D, without addressing degenerate cases or providing control gradient information.
+
+Dual-stage collision detection algorithms~\cite{ketchel2008self}, for spatial closed chains first use dual vector algebra and Pl\"ucker~\citep{miller2005plucker} coordinates to quickly check for possible collisions between infinite cylinders, and, if potential collisions are detected, perform precise second-stage testing between finite cylinders using detailed geometric calculations. While mathematically elegant, this approach may not provide the continuous distance metrics needed by modern control systems for obstacle avoidance, and it formulates collision detection as a constrained nonlinear minimization problem, which introduces complexity for real-time applications by requiring conjugate gradient methods with barrier functions to solve. \citet{larsen2000fast} presented an RSS-based proximity algorithm that combines rectangles with uniform sphere expansion to create efficient bounding volumes, building hierarchical trees using covariance analysis and geometric slab properties for fast distance calculations. Performance improvements come from priority-directed search and triangle caching that leverages frame-to-frame coherence. While outperforming sphere-based hierarchies, the approach struggles with non-convex geometry, requiring decomposition into multiple parts, and can experience numerical instabilities in near-intersection cases, sometimes producing overly conservative distance estimates that reduce query efficiency.
+
+More recent formulations pursue continuous metrics directly. \citet{xu2020pseudo} proposed a
+pseudo-distance algorithm for collision detection of manipulators using a
+convex-plane-polygons-based representation, and \citet{xia2024collision} formulate collision
+detection between convex objects using pseudo-distance and unconstrained optimization. The necessity
+of collision detection methods is not limited to manipulators but extends to autonomous vehicle
+motion planning and multi-agent path planning, and the human-robot case has been addressed directly
+through multi-level optimization for fast distance calculation between a human and a manipulator,
+and through early prediction of human motion for collaborative manipulation
+planning~\citep{mainprice2013human}.
+
+\begin{table}[htbp]
+\centering
+\caption{Collision detection and distance computation methods, classified by the form of output they
+provide to a controller.}
+\label{tab:lit_collision}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\toprule
+\textbf{Method} & \textbf{Representation} & \textbf{Output} & \textbf{Limitation} \\
+\midrule
+\citet{lumelsky1985fast}   & Line segments        & Discrete distance   & No gradient for smooth planning \\
+\citet{gilbert1988fast}    & Convex polytopes     & Distance            & Convexity assumption \\
+\citet{larsen2000fast}     & Swept-sphere volumes & Bounded distance    & Non-convex geometry, instability \\
+\citet{redon2005fast}      & Articulated models   & Continuous contact  & Cost for many links \\
+\citet{xu2020pseudo}       & Convex plane polygons& Pseudo-distance     & Representation build cost \\
+\citet{montaut2024gjk}     & Accelerated GJK      & Distance            & Convexity assumption \\
+\citet{das2020learning}    & Data-driven          & Binary / threshold  & Black box, large data requirement \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+%% ------------------------------------------------------------
+\subsection{Learning-Based Methods}\label{subsec:lit_learned_collision}
+%% ------------------------------------------------------------
+
+Learning-based methods have attracted attention from researchers due to their potential to
+accelerate collision detection applications. Machine-learning models have been introduced that serve
+as better alternatives to conventional geometric methods, achieving considerable speedup in motion
+planning applications. In the same way, the minimum distance between manipulator links has been used
+as a criterion for collision detection, with a neural network trained on distance data for collision
+prediction against a fixed threshold~\citep{das2020learning}. While learning methods can learn complex non-linear collision patterns from labeled data, the learning mechanisms are black boxes and need large amounts of data for learning, which limits their applicability where interpretability or guaranteed behavior is required. This trade-off, between the interpretability and determinism of geometric methods and the speed of learned ones, is what motivates a closed-form analytical treatment that retains continuous distance metrics while remaining cheap enough for real-time evaluation.
+
+%% ============================================================
+\section{Motion Planning and Artificial Potential Fields}\label{sec:lit_planning}
+%% ============================================================
+
+The planning of dual-arm movements addresses coordination through two primary approaches. Path
+planning generates geometric trajectories avoiding obstacles and self-collisions, prioritizing
+spatial relationships without timing information. Motion planning extends this by incorporating
+velocity profiles, acceleration constraints, and dynamic considerations, creating time-parametrized
+trajectories~\citep{abbas2023systematic}. The selection between these approaches depends on
+application requirements, with industrial manipulation tasks often benefiting from motion planning's
+ability to manage the temporal aspects of coordination between manipulators. \citet{tang2012review} provide a comprehensive review of robot motion planning approaches, categorizing and analysing the research evolution from 1980 to 2010. They systematically compared conventional approaches such as Bug algorithms, roadmaps, cell decomposition, potential fields, and mathematical programming with heuristic methods including neural networks, genetic algorithms, and fuzzy logic, demonstrating the field's evolution from conventional methods in the 1980s to predominantly heuristic approaches by the 2000s. Their analysis includes quantitative comparisons of implementation frequency for each approach and identifies future research directions for integrating perception, sensing, and motion planning.
+
+\citet{khatib1986real} pioneered the Artificial Potential Field method, transforming discrete path
+planning into a continuous optimization problem in which the robot is treated as a particle moving
+under the influence of attractive forces toward the goal and repulsive forces away from obstacles.
+The formulation's appeal is that it is reactive and cheap to evaluate, producing a control signal
+directly rather than a path that must subsequently be tracked. \citet{volpe1987artificial} refined
+the original concept by introducing elliptical iso-potential contours that vary with distance,
+improving convergence properties, and potential-field formulations have since been extended to
+real-time multi-agent navigation in industrial environments~\citep{prajapati2026mppf}.
+
+For dual-arm systems, however, APF methods face unique challenges related to workspace sharing and
+coordinated manipulation in manufacturing contexts. Alternating master-slave paradigms with charged
+surface workspace modeling have been employed for collision avoidance~\cite{chuang2006alternate}. However, the sequential trajectory planning approach lacks true coordination and may cause deadlocks in constrained workspaces. Exponential-field variants developed for aerial navigation with vertical motion prioritization suffer from oscillations in complex obstacle environments\citep{jayaweera2020dapf}. Hybrid combinations of APF with sampling-based planners have been proposed for mobile dual-arm systems, and force sensing has been integrated with rotating repulsive fields for enhanced navigation capabilities, but neither resolves the asymmetric dual-arm case~\citep{lin2025robot}. Hierarchical leader-follower deep reinforcement learning frameworks using Soft Actor-Critic have been proposed for dual-arm closed-chain manipulation in cooperative transportation\citep{cui2024task, hao2024coordinated}. While such approaches demonstrate task adaptability to random target poses, they require extensive offline training for convergence, and the fixed leader-follower structure limits applicability, performing well in symmetric manipulation scenarios but struggling with asymmetric dual-arm coordination. Once task allocation is determined, the fundamental challenge shifts to coordinated motion execution while ensuring collision-free trajectories in shared workspace environments, which is where the continuous distance metrics of Section~\ref{sec:lit_collision} become the input to the planner rather than merely a safety monitor.
+
+%% ============================================================
+\section{Inverse Kinematics for Manipulator Control}\label{sec:lit_ik}
+%% ============================================================
+
+Robotic manipulators are indispensable to modern industrial automation, serving as the backbone for
+tasks ranging from precision assembly to complex material handling. Traditionally, spherical wrist
+designs have dominated the industry due to their kinematic decoupling, which facilitates independent
+closed-form analytical solutions for position and
+orientation~\citep{rodriguez2024singularity}. While these designs have long been the industrial
+standard, they impose significant structural limitations~\citep{shah2019comparison}. The geometric
+constraint requiring the final three axes to intersect at a common point often compromises
+mechanical stiffness and restricts the integration of high-torque motors within compact wrist
+assemblies~\citep{ostermeier2025automatic}. Consequently, non-spherical wrist manipulators have
+gained prominence, achieving superior structural integrity and higher payload-to-weight ratios by
+introducing offsets between the last three axes~\citep{carbonari2023inverse}. This violation of
+kinematic decoupling renders analytical inverse kinematics intractable, necessitating reliance on
+complex numerical or data-driven solvers.
+
+%% ------------------------------------------------------------
+\subsection{Analytical and Numerical Solvers}\label{subsec:lit_analytical}
+%% ------------------------------------------------------------
+
+To address the general inverse kinematics problem, several classical methods including numerical,
+analytical, combined, and heuristic frameworks have been used in the literature. Iterative solvers
+such as TRAC-IK~\citep{beeson2015trac} are widely used for their system-agnostic ability to handle
+joint limits and multiple constraints. However, even with a previous joint-state seed and a distance
+parameter for solution selection, TRAC-IK remains fundamentally trajectory-unaware. Each waypoint is
+resolved as an independent optimization with no inter-waypoint coupling, leading to
+configuration-branch switching and joint-space discontinuities during continuous trajectory
+tracking. Heuristic methods such as FABRIK~\citep{aristidou2011fabrik} are computationally efficient but limited to position-reaching applications and lack the necessary temporal awareness. Analytical closed-form solutions reduce the complex kinematics of the robot into a single 16th-degree polynomial to calculate all possible joint configurations for a given pose~\citep{zohour2021kinova}. Without strict nearest-joint constraints, continuous sub-millisecond
+tracking causes the solver to jump between completely different joint configurations. Automatic geometric decomposition has been proposed to recover analytical solutions where the structure permits~\citep{ostermeier2025automatic}, and metaheuristic algorithms have been compared for solving manipulator inverse kinematics, but neither removes the fundamental coupling introduced by wrist offsets.
+
+%% ------------------------------------------------------------
+\subsection{Velocity-Level Controllers}\label{subsec:lit_velocity}
+%% ------------------------------------------------------------
+
+Velocity-level controllers address the trajectory-awareness problem by operating directly in the
+differential domain. Resolved-rate motion control~\citep{whitney1969resolved} computes joint
+velocities using the Jacobian pseudo-inverse. Damped least squares
+formulations~\citep{wampler1986manipulator,chiaverini1994review} introduce a damping factor to
+prevent velocity singularities, trading a small tracking error near singular configurations for
+bounded joint velocities, and \citet{nakamura1986inverse} established the singularity-robustness
+properties that make this practical for hardware. Quadratic velocity-level programming
+formulations~\citep{zhang2013variable} further impose joint limit constraints explicitly, offering
+safer hardware deployment, and null-space saturation methods handle joint constraints in redundant
+manipulators~\citep{flacco2012motion}. Model predictive contouring control has been applied to
+manipulators for reactive trajectory following~\citep{yoon2025reactive}. All of these methods,
+however, require an explicit, accurate Jacobian at every timestep, which is the cost that
+learning-based differential formulations seek to remove. Visual servo
+control provides the complementary sensing side of this loop, computing Cartesian pose error
+directly from image measurements~\citep{hutchinson1996tutorial}.
+
+%% ------------------------------------------------------------
+\subsection{Learning-Based and Hybrid Approaches}\label{subsec:lit_learned_ik}
+%% ------------------------------------------------------------
+
+To improve upon the accuracy limitations of classical velocity controllers, hybrid approaches have
+emerged combining numerical methods with learned components~\citep{wang2023two}. Learning-based methods have been explored as a residual corrector atop numerical solvers, compensating for solver inaccuracies~\citep{jia2019finite, chen2019neural}. An actor-critic RL approach has been introduced as a correction signal in joint velocity space to an augmented PD controller for trajectory tracking on a 6-DOF industrial manipulator~\citep{pane2016actor}, and~\citet{aghaei2022real} a
+gradient-free, model-free Bayesian Markov Chain Monte Carlo RL policy search has been used for
+circular trajectory control on a 2-DOF manipulator in simulation to optimize a PD controller. A Soft
+Actor-Critic based outer-loop stochastic reference correction policy has been learned directly on a
+7-DOF manipulator, augmenting an existing vendor-provided hardware controller with bounded
+corrective actions as an inheritance rather than learning from the environment~\citep{pavlichenko2022real}. Distributed PPO with
+LSTM and generalized advantage estimation has been applied to trajectory tracking on lower-DOF
+platforms using random reference state initialization and an exponential position-error
+reward~\citep{zhang2019trajectory}.
+
+Compound controllers have also been proposed, combining a sliding mode controller with SAC-based RL
+augmented by Lyapunov stability constraints for manipulator trajectory tracking~\citep{liu2022reinforcement, mao2025real}. While this requires
+a complete dynamic model of the system, it demonstrates that model-based initialization
+significantly improves RL sample efficiency. A hybrid framework combining Twin Delayed Deep
+Deterministic Policy Gradient with an RRT-generated reference trajectory penalizes deviation from
+the reference directly, constraining the agent to refine a pre-computed joint-space path~\citep{ota2019trajectory}.~\citet{elumalai2025proximal} proposed a collaborative PPO variant has been formulated for tracking and vibration suppression of a flexible-joint manipulator, reporting that PPO-based policies converge faster and more stably than actor-critic and policy-gradient baselines under hardware-in-the-loop validation, and~\citet{li2021general} proposed traditional path planner-DRL frameworks have combined RRT* with actor-critic algorithms to find energy-optimized IK solutions for redundant manipulators, treating IK as a pose-reaching problem solved point by point.
+
+Several DDPG-based methods have been explored to enhance trajectory tracking, though these often
+depend on simplified assumptions or known dynamics.~\citet{majumder2024enhancing} proposed sequential DDPG approaches for $n$-link manipulators utilize dual actor-critic networks trained progressively from 2D to 3D space to accelerate convergence. Distributed DDPG frameworks with prioritized experience replay employ multiple synchronous workers that explore diverse policies to update a shared global network~\citep{zhang2019trajectory}. Hybrid variants learn joint torque commands by embedding an explicitly derived Euler-Lagrange dynamic model within the simulation~\citep{hazem2025reinforcement}. While these methods demonstrate efficacy in simulation, they frequently operate in joint torque space requiring precise manipulator dynamics, and lack real-time hardware validation, leaving the sim-to-real gap unaddressed. Moreover, these frameworks often overlook orientation control and motion smoothness, which are critical for scaling to 6-DOF manipulators.
+
+\begin{table}[htbp]
+\centering
+\caption{Inverse kinematics solver families and their suitability for continuous trajectory tracking
+on a non-spherical wrist.}
+\label{tab:lit_ik}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\toprule
+\textbf{Family} & \textbf{Representative} & \textbf{Trajectory aware} & \textbf{Requirement} \\
+\midrule
+Iterative numerical & TRAC-IK~\citep{beeson2015trac}          & \xmark & Per-waypoint optimization \\
+Heuristic           & FABRIK~\citep{aristidou2011fabrik}      & \xmark & Position only \\
+Analytical          & Polynomial~\citep{zohour2021kinova}     & \xmark & Nearest-joint constraint \\
+Resolved-rate       & RRMC~\citep{whitney1969resolved}        & \cmark & Explicit Jacobian \\
+Damped least squares& DLS~\citep{chiaverini1994review}        & \cmark & Explicit Jacobian, damping \\
+Quadratic program   & QP~\citep{zhang2013variable}            & \cmark & Explicit Jacobian, solver \\
+Learned differential& DIKPPO~\citep{sk2025diktracking}           & \cmark & Training, no Jacobian \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+%% ============================================================
+\section{Reinforcement Learning for Manipulation}\label{sec:lit_rl}
+%% ============================================================
+
+Intelligent robotic manipulation is a key element of autonomous operations in industrial automation
+systems. Recent advancements in robot learning have significantly accelerated the pace of this
+research, especially through the integration of Imitation Learning and Reinforcement Learning for
+the autonomous generation of complex and intelligent robotic manipulation
+skills~\citep{zare2024survey}.
+
+%% ------------------------------------------------------------
+\subsection{Single-Agent Reinforcement Learning}\label{subsec:lit_single_rl}
+%% ------------------------------------------------------------
+
+Conventional robotic control methods typically involve modular pipelines consisting of sequential
+planning and control stages. These methods depend on accurate kinematic or dynamic models, which are
+often complex and difficult to obtain in practice, and predefined control sequences struggle to
+generalize across task variations without explicit re-engineering of each module~\citep{he2023robotic}. Data-driven control techniques such as Learning from Demonstration, and data collection via teach pendants or tele-operation, do not require explicit knowledge of robot dynamics or environmental models to execute tasks. Although these approaches eliminate the dependency on accurate dynamic models, they require a large volume of high-quality data, so that performance remains constrained by the availability and diversity of the collected datasets, often making them difficult to scale in complex industrial environments~\citep{zhang2015towards}.
+
+To overcome these limitations of data scarcity and human dependence on data collection,
+reinforcement learning has been introduced as a powerful
+alternative~\citep{kober2013reinforcement}. Unlike data-dependent IL and LfD, RL enables a robot to
+figure out optimal control policies through interaction and exploration with the surroundings.
+Although RL methods require extensive training time to converge, their capacity to learn optimal
+control robustly is often more reliable than static data-driven approaches, and by optimizing a
+well-defined reward function, RL-based agents can potentially surpass the performance of human
+experts and develop resilient recovery behaviors that are not represented in static
+datasets~\citep{zare2024survey, brune2025deep, gu2017deep}.
+
+Recent studies demonstrate that RL is highly effective for robot control across various domains,
+including trajectory optimization~\citep{majumder2024enhancing, mao2025real}, intelligent pick-and-place operations~\citep{deng2019deep, mehta2024waypoint}, obstacle avoidance~\citep{zhu2022robot, al2024reinforcement}, and human-robot interaction tasks~\citep{qureshi2018intrinsically, zhang2022reinforcement}. RL enables robots to learn from experience and provides a flexible framework for handling non-linear dynamics and unstructured environments that often challenge traditional control methodologies. However, extending RL to multi-agent configurations poses a high-dimensional action space that leads to exponential growth in exploration complexity~\citep{low2025cooperative, nguyen2020deep}. Furthermore, the requirement for precise spatio-temporal synchronization between agents such as a dual-arm system makes the reward assignment problem significantly more challenging than in simple single-agent applications.
+
+%% ------------------------------------------------------------
+\subsection{Multi-Agent Reinforcement Learning and CTDE}\label{subsec:lit_marl}
+%% ------------------------------------------------------------
+
+Although single-arm manipulation based on RL has demonstrated promising results, complex tasks such
+as alignment and assembly of components require collaborative manipulation rather than isolated
+single-arm execution. Extending RL from single-agent to multi-agent systems poses significant
+challenges. In a single-agent environment, an agent is concerned only with the outcomes of its own
+actions within a stationary distribution. However, in multi-agent domains, an agent must account for
+both the consequences of its own actions and the evolving behaviors of other agents. This
+interaction introduces non-stationarity into the learning process, as the optimal policy of one
+agent becomes dependent on the fluctuating strategies of its
+counterparts~\citep{low2025cooperative,nguyen2020deep}.
+
+Multi-Agent Reinforcement Learning was introduced to address these challenges by explicitly
+modelling the interactions between multiple decision-making
+entities~\citep{albrecht2024multi,low2025cooperative}. MARL methods are broadly classified along
+three primary axes. First, by cooperation structure. Agents may be fully cooperative, sharing a
+joint reward to achieve a common goal, fully competitive, operating in zero-sum settings, or mixed,
+pursuing partially conflicting objectives. Second, by the training and execution paradigm.
+Independent Learning treats other agents as part of a non-stationary
+environment~\citep{dewitt2020independent}, Centralized Training with Decentralized Execution enables
+agents to learn a shared critic during training while maintaining independent policies during
+execution, and Centralized Learning subordinates all agents to a single controlling entity. Third,
+by communication protocol. Communicative agents explicitly share state or intent information, while
+non-communicative agents must implicitly infer the behaviors of others through observed
+actions~\citep{liu2024efficient, chai2025survey}.
+
+For dual-arm manipulation, the problem is most effectively formulated as a fully cooperative
+decentralized partially observable Markov Decision Process under the CTDE
+paradigm~\citep{yu2022surprising}. While recent heterogeneous-agent CTDE methods such as HATRPO and
+HAPPO~\citep{} offer monotonic improvement guarantees for asymmetric tasks via sequential policy
+updates~\citep{kuba2021trust}, agents in a symmetric dual-arm system are structurally symmetric,
+each arm sharing identical architecture and observation dimensionality. In this homogeneous
+cooperative setting, MAPPO's simultaneous update with a shared global-state critic is well suited,
+directly capturing inter-arm spatial relationships during training while preserving decentralized
+execution at deployment~\citep{chai2025survey}.
+
+Despite the theoretical advantages of CTDE frameworks, their direct application to dual-arm
+collaborative manipulation presents significant practical problems. Specifically, when agents are
+required to simultaneously acquire low-level actuator skills and high-level inter-agent coordination
+from scratch, sample efficiency degrades exponentially~\citep{yu2022surprising, zhu2020ingredients}. Current dual-arm MARL approaches often rely on rigid hand-designed action priors that do not adapt to different task phases. Furthermore, the existing literature lacks a principled mechanism for smoothly transitioning between stable single-arm priors and learned multi-agent coordination policies. This leaves the entire computational burden on the MARL agents, ultimately limiting the scalability and sim-to-real transferability of the learned controllers.
+
+%% ============================================================
+\section{Research Gaps}\label{sec:lit_gaps}
+%% ============================================================
+
+The review above consolidates into seven gaps, which correspond to those introduced in Chapter~1 and
+are restated here in the terms established by this chapter.
+
+\begin{enumerate}
+    \item \textbf{Perception for small, low-feature components.} Pose estimation methods depend on
+    accurate segmentation and degrade under occlusion and lighting variation. Descriptor learning
+    carries high computational cost and dataset dependence, and synthetic-data approaches raise
+    domain adaptation concerns. Existing sorting research remains limited in handling densely packed
+    objects with limited visual features, and many methods require multiple sensors that increase
+    system complexity and cost~\citep{sk2024bolthandling,sk2024boltsorting}.
+
+    \item \textbf{Runtime arm selection from onboard perception.} Coordination has been addressed by
+    control-level coupling, by centrally solved scheduling from an external view, or by offline
+    static workspace zoning. In no case is a second arm's own eye-in-hand camera used to decide
+    which arm should manipulate a shared target at runtime~\citep{sk2025sharedvision}.
+
+    \item \textbf{Sensor-free, real-time inter-arm distance.} Conventional collision detection either
+    depends on external sensors or on computationally expensive algorithms that compromise real-time
+    applicability. Classical geometric formulations provide only discrete detection without the
+    continuous, differentiable distance metrics that modern controllers require for smooth motion
+    planning, while learned detectors are black boxes requiring large
+    datasets~\citep{sk2025distance,surya2025iapf}.
+
+    \item \textbf{Stable asymmetric dual-arm motion planning.} Asymmetric coordinated manipulation
+    enables a wider range of complex tasks but is more challenging, and APF methods face unique
+    difficulties related to workspace sharing, deadlock in constrained workspaces, and oscillation
+    in complex obstacle environments~\citep{surya2025iapf,sk2025competitive}.
+
+    \item \textbf{Adaptive task allocation.} Current industrial practice assigns fixed object types
+    to each arm and fails when objects appear outside designated zones. Market-based methods incur
+    centralized bottlenecks, round-robin ignores spatial conflict, and learning-based allocation
+    requires extensive offline training while excluding physical task
+    locations~\citep{sk2025competitive}.
+
+    \item \textbf{Trajectory tracking on non-spherical wrists.} The violation of kinematic decoupling
+    renders analytical IK intractable, iterative solvers remain trajectory-unaware, and classical
+    velocity-level controllers require an explicit, accurate Jacobian at every timestep. No prior
+    work demonstrates that a policy trained purely on static pose reaching, without trajectory
+    supervision, generalizes to continuous trajectory tracking at
+    deployment~\citep{sk2025diktracking}.
+
+    \item \textbf{Sample-efficient dual-arm coordination learning.} When agents must simultaneously
+    acquire low-level actuator skills and high-level coordination from scratch, sample efficiency
+    degrades exponentially, and the literature lacks a principled mechanism for smoothly
+    transitioning between stable single-arm priors and learned multi-agent coordination
+    policies~\citep{sk2025alpha}.
+\end{enumerate}
+
+The chapters that follow address these gaps in the order established in Chapter~1.

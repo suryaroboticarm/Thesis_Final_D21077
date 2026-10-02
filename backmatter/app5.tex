@@ -1,0 +1,126 @@
+%============================= app5.tex================================
+\chapter{Reinforcement Learning Preliminaries: GAE, the PPO Clipped Objective, and CTDE}
+\label{app:rl}
+
+Chapter~\ref{chap:learned_control} builds both of its studies on Generalized Advantage Estimation
+(GAE) and the PPO clipped surrogate objective (Equations~\eqref{eq:dikppo_gae}
+and~\eqref{eq:dikppo_ppoloss}), and its second study further extends them to a centralized-critic,
+decentralized-actor setting (Equations~\eqref{eq:alpha_gae}--\eqref{eq:alpha_totalloss}), all cited
+to~\citep{schulman2017proximal,yu2022surprising} rather than derived. This appendix derives GAE from
+its underlying $k$-step estimators, motivates the clipped objective as a pessimistic bound on the
+unclipped surrogate, and extends both to the centralized critic used in ALPHA.
+
+%% ============================================================
+\section{The \texorpdfstring{$k$}{k}-Step Advantage Estimator}\label{sec:appE_kstep}
+%% ============================================================
+
+The $k$-step advantage estimator bootstraps $k$ real rewards against the critic's value estimate
+thereafter,
+\begin{equation}
+\hat{A}_t^{(k)} = \sum_{l=0}^{k-1}\gamma^l r_{t+l} + \gamma^k V(s_{t+k}) - V(s_t).
+\label{eq:appE_kstep}
+\end{equation}
+Writing the one-step temporal-difference residual as $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$
+and expanding $\sum_{l=0}^{k-1}\gamma^l\delta_{t+l}$ term by term,
+\begin{equation}
+\sum_{l=0}^{k-1}\gamma^l\delta_{t+l} = \sum_{l=0}^{k-1}\gamma^l r_{t+l}
++ \sum_{l=0}^{k-1}\gamma^{l+1}V(s_{t+l+1}) - \sum_{l=0}^{k-1}\gamma^l V(s_{t+l}),
+\label{eq:appE_expand}
+\end{equation}
+the last two sums telescope, since every $V(s_{t+l})$ term for $1\leq l\leq k-1$ appears once with
+coefficient $+\gamma^l$ and once with coefficient $-\gamma^l$, leaving only the first and last
+values, $\gamma^kV(s_{t+k}) - V(s_t)$. Equation~\eqref{eq:appE_expand} therefore reduces exactly to
+Equation~\eqref{eq:appE_kstep},
+\begin{equation}
+\hat{A}_t^{(k)} = \sum_{l=0}^{k-1}\gamma^l\delta_{t+l}.
+\label{eq:appE_kstepdelta}
+\end{equation}
+
+%% ============================================================
+\section{GAE as an Exponentially-Weighted Average}\label{sec:appE_gae}
+%% ============================================================
+
+GAE$(\gamma,\lambda)$ is defined as an exponentially-weighted average over every horizon $k \geq 1$,
+with weight $(1-\lambda)\lambda^{k-1}$ summing to one over $k$:
+\begin{equation}
+\hat{A}_t^{\text{GAE}} = (1-\lambda)\sum_{k=1}^{\infty}\lambda^{k-1}\hat{A}_t^{(k)}
+= (1-\lambda)\sum_{k=1}^{\infty}\lambda^{k-1}\sum_{l=0}^{k-1}\gamma^l\delta_{t+l},
+\label{eq:appE_gaedef}
+\end{equation}
+using Equation~\eqref{eq:appE_kstepdelta}. Exchanging the order of summation, for a fixed $l \geq 0$
+the inner term $\gamma^l\delta_{t+l}$ appears in Equation~\eqref{eq:appE_gaedef} for every $k \geq
+l+1$,
+\begin{equation}
+\hat{A}_t^{\text{GAE}} = (1-\lambda)\sum_{l=0}^{\infty}\gamma^l\delta_{t+l}\sum_{k=l+1}^{\infty}\lambda^{k-1}
+= (1-\lambda)\sum_{l=0}^{\infty}\gamma^l\delta_{t+l}\,\frac{\lambda^l}{1-\lambda}
+= \sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l},
+\label{eq:appE_gaeresult}
+\end{equation}
+using $\sum_{k=l+1}^{\infty}\lambda^{k-1} = \lambda^l/(1-\lambda)$, the tail of a geometric series.
+Equation~\eqref{eq:appE_gaeresult} is exactly the (infinite-horizon) form of
+Equation~\eqref{eq:dikppo_gae}; the finite sum to $N_{\text{steps}}$ used there is the natural
+truncation of Equation~\eqref{eq:appE_gaeresult} to the length of a single collected rollout, with
+$\lambda \to 1$ recovering the full Monte Carlo return-based advantage and $\lambda \to 0$ recovering
+the one-step estimator $\hat A_t^{(1)} = \delta_t$.
+
+%% ============================================================
+\section{The PPO Clipped Objective as a Pessimistic Bound}\label{sec:appE_clip}
+%% ============================================================
+
+The conservative policy iteration objective $L^{\text{CPI}}(\theta) = \mathbb{E}_t[\rho_t(\theta)\hat
+A_t]$, with $\rho_t(\theta) = \pi_\theta(\mathbf{a}_t\mid\mathbf{s}_t)/\pi_{\theta_{\text{old}}}
+(\mathbf{a}_t\mid\mathbf{s}_t)$ as in Equation~\eqref{eq:dikppo_ppoloss}, is only a locally valid
+surrogate for the true expected return: it is exact at $\rho_t=1$ (no policy change) but its linear
+growth in $\rho_t$ gives no guarantee once $\theta$ moves far from $\theta_{\text{old}}$, since the
+importance-sampling estimate it is built from degrades as the two policies diverge. Trust-region
+methods bound this divergence with an explicit constraint, $\max_\theta L^{\text{CPI}}(\theta)$
+subject to $\mathbb{E}_t[\text{KL}(\pi_{\theta_{\text{old}}}\Vert\pi_\theta)] \leq \delta$. The
+clipped objective of Equation~\eqref{eq:dikppo_ppoloss} achieves a similar effect without an explicit
+constraint, by removing the incentive to move $\rho_t$ far from $1$ once its sign-appropriate
+direction is already saturated. Consider the two cases of the inner term separately:
+\begin{itemize}
+    \item $\hat A_t > 0$ (a better-than-expected action): $L^{\text{CLIP}}$'s per-sample term is
+    $\min\left(\rho_t\hat A_t,\, (1+\epsilon)\hat A_t\right)$, which grows with $\rho_t$ only until
+    $\rho_t = 1+\epsilon$, after which the minimum saturates at the constant
+    $(1+\epsilon)\hat A_t$. Its derivative with respect to $\rho_t$ is therefore zero for $\rho_t >
+    1+\epsilon$, removing the gradient signal that would otherwise keep increasing the action's
+    probability without bound.
+    \item $\hat A_t < 0$ (a worse-than-expected action): the same minimum instead saturates once
+    $\rho_t$ falls below $1-\epsilon$, removing the gradient signal that would keep decreasing the
+    action's probability without bound.
+\end{itemize}
+In both cases $L^{\text{CLIP}}(\theta) \leq L^{\text{CPI}}(\theta)$ term by term, since the minimum of
+two quantities never exceeds either, so $L^{\text{CLIP}}$ is a pessimistic (lower) bound on the
+surrogate objective that is exact near $\rho_t = 1$ and flattens exactly where the trust-region
+constraint would otherwise become active, achieving qualitatively the same restraint on the policy
+update as the explicit KL constraint without requiring it to be solved at every step.
+
+%% ============================================================
+\section{Extension to a Centralized Critic (CTDE)}\label{sec:appE_ctde}
+%% ============================================================
+
+The Multi-Agent PPO objective of Equations~\eqref{eq:alpha_gae}--\eqref{eq:alpha_totalloss} used for
+ALPHA's coordination policy replaces every occurrence of the single-agent state $s_t$ used as the
+critic's argument above with the shared global state $S_t \in \mathbb{R}^{92}$, while leaving the
+actor's argument as each agent's own local observation $\mathbf{s}_t^i \in \mathbb{R}^{47}$. The
+$k$-step telescoping argument of Section~\ref{sec:appE_kstep} and the exponential-weighting argument
+of Section~\ref{sec:appE_gae} depend only on $V(\cdot)$ being a scalar function bootstrapped
+consistently across consecutive timesteps; substituting $V_{\phi^i}(S_t)$ for $V_\theta(s_t)$
+throughout leaves the algebra of Equations~\eqref{eq:appE_expand}--\eqref{eq:appE_gaeresult}
+unchanged and yields Equation~\eqref{eq:alpha_gae} directly, with per-agent reward $r_{t+1}^i$
+retained (each agent is credited for its own progress) while the bootstrap target is evaluated on the
+state both agents' configurations are visible in. This is precisely the asymmetry that defines CTDE:
+the actor loss $\mathcal{L}^{\text{CLIP}}$ of Equation~\eqref{eq:alpha_totalloss} is a function of
+$\mathbf{s}_t^i$ alone, so the trained policy can be executed with only local information, while the
+critic loss $\mathcal{L}^V$ is a function of $S_t$, so training benefits from information no single
+agent observes at deployment. Section~\ref{sec:appE_clip}'s clipping argument applies unchanged to
+$\rho_t^i(\theta)$ of Equation~\eqref{eq:alpha_ratio}, since it depends only on the ratio of two
+policy densities evaluated at the same local observation, not on how the accompanying advantage
+estimate was computed.
+
+%========================================================================
+
+%%% Local  Variables:
+%%% mode:  latex
+%%% TeX-master: "Thesis.tex"
+%%% End:

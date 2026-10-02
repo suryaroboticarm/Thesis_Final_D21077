@@ -1,0 +1,98 @@
+%============================= app4.tex================================
+\chapter{Damped Least-Squares Inverse Kinematics as Regularized Optimization}
+\label{app:dls}
+
+Section~\ref{subsec:sv_dls} states the damped least-squares (DLS) resolved-rate mapping,
+Equation~\eqref{eq:sv_dls}, $\dot{\mathbf{q}} = J^\top(JJ^\top+\lambda^2I)^{-1}\mathbf{v}$, as a
+known result, citing~\citep{whitney1969resolved,wampler1986manipulator,chiaverini1994review,
+nakamura1986inverse}. This appendix derives it from the underlying regularized least-squares
+problem and explains its singularity-robustness property, which motivates the manipulability-based
+switching of $\lambda$ used alongside it.
+
+%% ============================================================
+\section{The Regularized Least-Squares Problem}\label{sec:appD_problem}
+%% ============================================================
+
+The undamped resolved-rate problem is to find joint velocities $\dot{\mathbf{q}} \in \mathbb{R}^6$
+producing the commanded Cartesian twist $\mathbf{v} \in \mathbb{R}^6$ of Equation~\eqref{eq:sv_twist}
+exactly, $J\dot{\mathbf{q}} = \mathbf{v}$, for the manipulator Jacobian $J(\mathbf{q}) \in
+\mathbb{R}^{6\times6}$ of Equation~\eqref{eq:sv_jacobian}. Near a kinematic singularity $J$ loses
+rank and this equation has no solution, or an ill-conditioned one requiring arbitrarily large joint
+speeds for a small Cartesian motion. Damped least squares avoids this by relaxing exact tracking into
+a penalized optimization,
+\begin{equation}
+\dot{\mathbf{q}}^* = \arg\min_{\dot{\mathbf{q}}} \; \lVert J\dot{\mathbf{q}} - \mathbf{v} \rVert^2
++ \lambda^2 \lVert \dot{\mathbf{q}} \rVert^2,
+\label{eq:appD_objective}
+\end{equation}
+trading exact twist tracking (the first term) against a penalty on joint-speed magnitude (the second
+term), with $\lambda \geq 0$ setting the trade-off; $\lambda=0$ recovers the undamped problem exactly.
+
+%% ============================================================
+\section{Solving the Regularized Problem}\label{sec:appD_solve}
+%% ============================================================
+
+Expanding Equation~\eqref{eq:appD_objective} and setting its gradient with respect to
+$\dot{\mathbf{q}}$ to zero,
+\begin{equation}
+\nabla_{\dot{\mathbf{q}}}\left[ \lVert J\dot{\mathbf{q}}-\mathbf{v} \rVert^2 + \lambda^2\lVert
+\dot{\mathbf{q}} \rVert^2 \right]
+= 2J^\top(J\dot{\mathbf{q}}-\mathbf{v}) + 2\lambda^2\dot{\mathbf{q}} = 0,
+\label{eq:appD_gradzero}
+\end{equation}
+gives the normal equations $(J^\top J + \lambda^2 I)\dot{\mathbf{q}} = J^\top\mathbf{v}$, and, since
+$J^\top J + \lambda^2 I$ is positive definite (hence invertible) for any $\lambda > 0$ regardless of
+$J$'s rank,
+\begin{equation}
+\dot{\mathbf{q}}^* = \left( J^\top J + \lambda^2 I \right)^{-1} J^\top \mathbf{v}.
+\label{eq:appD_solution1}
+\end{equation}
+This is a valid, always-invertible solution, but it inverts a matrix in joint space
+($6\times6$ here, but $n\times n$ in general for an $n$-joint arm). The form actually used in
+Equation~\eqref{eq:sv_dls} inverts in task space instead; the two are shown equal by the identity
+\begin{equation}
+(J^\top J + \lambda^2 I)\,J^\top = J^\top J J^\top + \lambda^2 J^\top = J^\top (JJ^\top+\lambda^2I),
+\label{eq:appD_identity}
+\end{equation}
+which holds for any matrix $J$ by direct expansion. Left-multiplying Equation~\eqref{eq:appD_identity}
+by $(J^\top J+\lambda^2I)^{-1}$ and right-multiplying by $(JJ^\top+\lambda^2I)^{-1}$ gives
+\begin{equation}
+(J^\top J+\lambda^2I)^{-1}J^\top = J^\top(JJ^\top+\lambda^2I)^{-1},
+\label{eq:appD_pushthrough}
+\end{equation}
+so substituting the right-hand side of Equation~\eqref{eq:appD_pushthrough} into
+Equation~\eqref{eq:appD_solution1} gives exactly Equation~\eqref{eq:sv_dls},
+\begin{equation}
+\dot{\mathbf{q}}^* = J^\top\left( JJ^\top+\lambda^2I \right)^{-1}\mathbf{v}.
+\label{eq:appD_solution2}
+\end{equation}
+Equations~\eqref{eq:appD_solution1} and~\eqref{eq:appD_solution2} are algebraically identical, not
+merely approximately so; Equation~\eqref{eq:appD_solution2} is preferred in implementation because it
+inverts a $6\times6$ task-space matrix rather than an $n\times n$ joint-space matrix, which is
+cheaper whenever the manipulator has more joints than task-space degrees of freedom.
+
+%% ============================================================
+\section{Singularity Robustness and the Manipulability-Based Switch}\label{sec:appD_singularity}
+%% ============================================================
+
+Near a singularity, $J$ loses rank and $JJ^\top$ (equivalently $J^\top J$) becomes singular or
+near-singular, so the undamped solution $\dot{\mathbf{q}} = J^\top(JJ^\top)^{-1}\mathbf{v}$ blows up
+in the direction of the lost degree of freedom. Adding $\lambda^2I$ before inverting keeps
+$JJ^\top+\lambda^2I$ bounded away from singularity for any $\lambda>0$: writing $JJ^\top$'s
+eigenvalues as $\sigma_i^2 \geq 0$ (the squared singular values of $J$), the corresponding
+eigenvalues of $(JJ^\top+\lambda^2I)^{-1}$ are $1/(\sigma_i^2+\lambda^2)$, which stay finite even as
+$\sigma_i \to 0$, at the cost of no longer tracking $\mathbf{v}$ exactly along that direction, the
+price paid by the regularization term in Equation~\eqref{eq:appD_objective}. This is exactly the
+trade-off Section~\ref{subsec:sv_dls} exploits by switching $\lambda$ between a small nominal value
+away from singularities and a larger value near them, using the manipulability measure
+$\mu(\mathbf{q}) = \sqrt{\det(JJ^\top)} = \prod_i \sigma_i$ as the trigger: $\mu(\mathbf{q}) \to 0$
+exactly as the smallest singular value $\sigma_{\min} \to 0$, so $\mu(\mathbf{q})$ is a scalar proxy
+for proximity to a singularity without requiring an explicit singular value decomposition at every
+control cycle.
+
+%========================================================================
+
+%%% Local  Variables:
+%%% mode:  latex
+%%% TeX-master: "Thesis.tex"
+%%% End:
