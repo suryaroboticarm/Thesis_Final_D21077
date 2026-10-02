@@ -972,7 +972,7 @@ sample efficiency degrades exponentially when they do. Current approaches often 
 hand-designed action priors that do not adapt across task phases, and the literature lacks a
 principled mechanism for transitioning between a stable single-arm prior and a learned multi-agent
 coordination policy, leaving the entire computational burden on the coordination
-policy~\citep{sk2025alpha}. The study presented in this part removes that burden directly: the
+policy~\citep{sk2026priorguided}. The study presented in this part removes that burden directly: the
 frozen PPO controller of Part I, already shown to generalize across the four continuous trajectory
 geometries evaluated there, is reused unchanged as a stable low-level reaching prior for each arm, while a
 Multi-Agent PPO (MAPPO) coordination policy, trained under Centralized Training with Decentralized
@@ -1008,7 +1008,7 @@ alignment target provided to either agent.
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/Fig_1.jpg}
 % \caption{ALPHA architecture for cooperative dual-arm pre-assembly alignment: a frozen single-arm
-% DIK-PPO prior (lock symbol) and a MAPPO coordination policy (unlock symbol) are combined through the adaptive blending coefficient $\alpha_t^i$~\citep{sk2025alpha}.}
+% DIK-PPO prior (lock symbol) and a MAPPO coordination policy (unlock symbol) are combined through the adaptive blending coefficient $\alpha_t^i$~\citep{sk2026priorguided}.}
 \caption{GPC architecture for cooperative dual-arm pre-assembly alignment under the CTDE paradigm. The frozen PPO base policy (top) independently outputs a per-arm reaching action $\mathbf{b}_t^i$ from local observations; the MAPPO actor-critic (bottom) outputs a coordination correction $\mathbf{m}_t^i$ and a blending increment from the 47-D local observation, with each agent's critic conditioned on the shared 92-D global state $S_t$. The two actions are combined per Eq.~(\ref{eq:alpha_combined}) into the joint velocity command executed by each arm.}
 \label{fig:alpha_architecture}
 \end{figure}
@@ -1055,7 +1055,7 @@ undistorted.
 
 \begin{table}[htbp]
 \centering
-\caption{Local observation space, 47 dimensions per agent~\citep{sk2025alpha}.}
+\caption{Local observation space, 47 dimensions per agent~\citep{sk2026priorguided}.}
 \label{tab:alpha_localobs}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llcl}
@@ -1141,7 +1141,7 @@ Hyperparameters are listed in Table~\ref{tab:alpha_hyper}.
 
 \begin{table}[htbp]
 \centering
-\caption{MAPPO training hyperparameters~\citep{sk2025alpha}.}
+\caption{MAPPO training hyperparameters~\citep{sk2026priorguided}.}
 \label{tab:alpha_hyper}
 \begin{tabular}{lc}
 \toprule
@@ -1452,7 +1452,7 @@ completed the reach phase.
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/Fig_3.png}
 % \caption{Baseline comparison: total mean reward evolution of pure MARL algorithms and fixed-ratio
-% PPO plus MAPPO blends~\citep{sk2025alpha}.}
+% PPO plus MAPPO blends~\citep{sk2026priorguided}.}
 \caption{Training reward curves for pure MARL baselines and fixed-blend PPO+MAPPO variants. Curves are Gaussian-smoothed for clarity.}
 \label{fig:alpha_baseline}
 \end{figure}
@@ -1461,7 +1461,7 @@ completed the reach phase.
 \centering
 \caption{Evaluation results over 10 trials across 4096 parallel environments (mean $\pm$ std),
 comparing GPC against pure MARL algorithms and fixed blending
-ratios~\citep{sk2025alpha}. All methods were trained under a single seed (42) and evaluated over 10
+ratios~\citep{sk2026priorguided}. All methods were trained under a single seed (42) and evaluated over 10
 independent trials, so the reported deviations characterize evaluation variance at fixed
 initialization; seed-level variance for the proposed method is reported in
 Table~\ref{tab:seed_robustness}.}
@@ -1593,7 +1593,7 @@ both metrics, rather than diverge sharply on one.
 % \begin{table}[htbp]
 % \centering
 % \caption{Ablation study over 10 trials across 4096 parallel environments (mean $\pm$
-% std)~\citep{sk2025alpha}.}
+% std)~\citep{sk2026priorguided}.}
 % \label{tab:alpha_ablation}
 % \resizebox{\textwidth}{!}{%
 % \begin{tabular}{lccc}
@@ -1634,7 +1634,7 @@ established policy in a way that co-adapting from timestep zero avoids.
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/Fig_5.png}
 % \caption{Comparison of methods' adaptive scale $\alpha_t^i$ evolution over a single
-% episode~\citep{sk2025alpha}.}
+% episode~\citep{sk2026priorguided}.}
 \caption{Adaptive blending coefficient $\alpha^i_t$ evolution over a single episode for both arms across all trained variants, alongside the $\alpha$-detached control under each of its three training seeds.}
 \label{fig:alpha_evolution}
 \end{figure}
@@ -1723,7 +1723,7 @@ alignment by $T=60$\,s.
 
 \begin{table}[htbp]
 \centering
-\caption{Hardware deployment results over 30 trials with varied target positions~\citep{sk2025alpha}.}
+\caption{Hardware deployment results over 30 trials with varied target positions~\citep{sk2026priorguided}.}
 \label{tab:alpha_hwresults}
 \begin{tabular}{lccc}
 \toprule

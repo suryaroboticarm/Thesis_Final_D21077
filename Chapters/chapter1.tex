@@ -9,7 +9,7 @@ This thesis is organized around a single progression. Automating industrial comp
 Each stage is a precondition for the next rather than an independent application: a component cannot be manipulated before it is localized; a second arm cannot be added safely before it is decided which arm acts; and concurrent motion cannot be trusted without a continuous distance signal. Furthermore, that safety signal is only useful once a planner consumes it. Only with a working classical planner in hand does it become possible to identify, precisely, the coordination problem that classical control cannot solve on its own. This thesis traces that progression from start to finish, from a single arm sorting bolts by classical computer vision to a pair of arms coordinating a pre-assembly alignment through reinforcement learning.
 
 
-This thesis begins at the exact point where conventional robotic deployments begin to strain. While industrial robots reduce human fatigue and are forecast to grow into a USD 55.4 billion industry by 2032~\citep{develop2024robotic}, conventional, hard-coded single-arm systems no longer satisfy the demands of unstructured, high-throughput manufacturing~\citep{abbas2023systematic}. A single arm's reach is strictly fixed; as work cells scale up, the spatial distribution of components and complexity of the task routinely exceeds what one manipulator can physically cover/handle. Modern manufacturing increasingly demands collaborative task execution such as cooperative assembly alignment, where an operation inherently requires the simultaneous coordination of two arms. The standard industrial response for deploying a second arm within the same workspace, transforms a baseline perception based pick and place problem into a coordination problem, coordination into a safety problem, and safety into a motion planning problem. Each of these challenges is addressed sequentially by the studies comprising this thesis~\citep{surya2025iapf,sk2025competitive}. Finally, only when classical perception, coordination, safety, and planning frameworks are established does the fundamental limitation emerge: a fixed, hand-designed control law cannot inherently generalize across continuous trajectories or co-evolve a coordination strategy with a control prior. Learned control directly resolves this limitation~\citep{sk2025diktracking,sk2025alpha}.
+This thesis begins at the exact point where conventional robotic deployments begin to strain. While industrial robots reduce human fatigue and are forecast to grow into a USD 55.4 billion industry by 2032~\citep{develop2024robotic}, conventional, hard-coded single-arm systems no longer satisfy the demands of unstructured, high-throughput manufacturing~\citep{abbas2023systematic}. A single arm's reach is strictly fixed; as work cells scale up, the spatial distribution of components and complexity of the task routinely exceeds what one manipulator can physically cover/handle. Modern manufacturing increasingly demands collaborative task execution such as cooperative assembly alignment, where an operation inherently requires the simultaneous coordination of two arms. The standard industrial response for deploying a second arm within the same workspace, transforms a baseline perception based pick and place problem into a coordination problem, coordination into a safety problem, and safety into a motion planning problem. Each of these challenges is addressed sequentially by the studies comprising this thesis~\citep{surya2025iapf,sk2025competitive}. Finally, only when classical perception, coordination, safety, and planning frameworks are established does the fundamental limitation emerge: a fixed, hand-designed control law cannot inherently generalize across continuous trajectories or co-evolve a coordination strategy with a control prior. Learned control directly resolves this limitation~\citep{sk2025diktracking,sk2026priorguided}.
 
 This thesis develops that progression across four connected themes. It begins with
 \emph{perception} for small, low-textured industrial components such as fasteners, moves from a single arm to a \emph{dual-arm} system and the coordination question this raises, establishes the \emph{safety and motion-planning} paradigm that shared-workspace operation demands, and finally replaces the classical control layer with \emph{learned} controllers for both single-arm trajectory tracking and cooperative dual-arm alignment. Figure~\ref{fig:intro_roadmap} shows how the eight constituent studies map onto this progression, and Table~\ref{tab:intro_studies} summarizes each of them.
@@ -508,7 +508,7 @@ proposed framework is validated through direct sim-to-real transfer on physical 
 manipulators via the Kortex API, achieving 95.9\% reach and 93.9\% alignment success in simulation
 (mean over three training seeds) and pick-and-pre-assembly alignment of square and cylindrical peg-in-hole configurations on hardware
 at 20\,Hz, with a 200\,Hz policy inference rate on a CPU-only deployment
-platform~\citep{sk2025alpha}.
+platform~\citep{sk2026priorguided}.
 
 %% ============================================================
 \section{Experimental Platform}\label{sec:intro_platform}
@@ -525,7 +525,7 @@ cameras for independent per-arm perception~\citep{sk2025sharedvision}, and YOLOv
 box detection at 20--30 FPS for the planning and allocation
 studies~\citep{surya2025iapf,sk2025competitive}. Integration spans Gazebo with ROS1 and ROS2 and the
 ROS Kortex API for hardware communication, with control loops at 10--20\,Hz and a 200\,Hz policy
-inference rate on a CPU-only platform~\citep{sk2025competitive,sk2025alpha}. Validation progresses
+inference rate on a CPU-only platform~\citep{sk2025competitive,sk2026priorguided}. Validation progresses
 from simulation only, to simulation and hardware, to direct sim-to-real transfer.
 Table~\ref{tab:intro_results} collects the headline results.
 
@@ -600,7 +600,7 @@ studies in this thesis.
     acquire low-level actuator skills and high-level coordination from scratch, sample efficiency
     degrades exponentially, and the literature lacks a principled mechanism for smoothly
     transitioning between stable single-arm priors and learned multi-agent coordination
-    policies~\citep{sk2025alpha}.
+    policies~\citep{sk2026priorguided}.
 \end{description}
 
 % ---- TABLE: summary of the constituent studies ----
@@ -673,7 +673,7 @@ The contributions of this thesis, in the order the studies are developed, are as
     seventh action dimension, that interpolates between a frozen single-arm PPO prior and a MAPPO
     coordination correction at every timestep and co-evolves with the coordination policy from
     timestep zero. 95.9\% reach and 93.9\% alignment success in simulation (three-seed mean) with sim-to-real transfer
-    on a CPU-only platform~\citep{sk2025alpha}.
+    on a CPU-only platform~\citep{sk2026priorguided}.
 \end{description}
 
 %% ============================================================
