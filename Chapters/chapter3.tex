@@ -382,7 +382,7 @@ architectures, at the cost of a larger model than the two PPLiteSeg variants.
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Model} & \textbf{PPLiteSeg~I} & \textbf{PPLiteSeg~II} & \textbf{DeepLabV3+} & \textbf{OCRNet} \\
+\textbf{Model} & \textbf{PPLiteSeg~I}~\citep{peng2022pp} & \textbf{PPLiteSeg~II}~\citep{peng2022pp} & \textbf{DeepLabV3+}~\citep{chen2018encoder} & \textbf{OCRNet}~\citep{yuan2020object} \\
 \midrule
 Backbone            & STDC~I & STDC~II & ResNet101\_vd & HRNet-48w \\
 mIoU                & 0.8921 & 0.8964  & \textbf{0.92}  & 0.9135 \\
@@ -570,7 +570,7 @@ in the regime each targets, summarized in Table~\ref{tab:vp_pipelinecompare}.
 \toprule
 & \textbf{Pipeline I (Section~\ref{sec:vp_template})} & \textbf{Pipeline II (Section~\ref{sec:vp_segmentation})} \\
 \midrule
-Segmentation      & $k$-means clustering, no training data & DeepLabV3+, custom-trained on 2000 images \\
+Segmentation      & $k$-means clustering, no training data & DeepLabV3+~\citep{chen2018encoder}, custom-trained on 2000 images \\
 Bolt configuration & Overlapping, arbitrary 3D tilt in a bin & Singulated, presented flat to the camera \\
 Pose search        & Full $(\theta, \delta)$ Oriented Chamfer Matching & Bounding-box angle $\theta$ from the mask \\
 Size cue           & Contour-to-centroid radius $R$ & Bolt head diameter $D_{px}$ \\

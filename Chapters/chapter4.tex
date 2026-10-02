@@ -207,7 +207,7 @@ $\Delta_{\text{search}}$ & Sweep half-range                                     
 $\epsilon_q$             & Joint-limit safety margin                                        & $0.08$~rad \\
 \midrule
 \multicolumn{3}{l}{\textit{Perception}} \\
---                       & ArUco dictionary                                                 & \texttt{5X5\_50} \\
+--                       & ArUco dictionary~\citep{garrido2014automatic}                      & \texttt{5X5\_50} \\
 --                       & Marker side length                                               & $0.05$~m \\
 \midrule
 \multicolumn{3}{l}{\textit{Manipulation waypoints}} \\
@@ -215,11 +215,11 @@ $\mathbf{a}$             & Approach offset, $\mathcal{A}_L$ / $\mathcal{A}_R$   
 $d$                      & Descend distance                                                 & $0.08$~m \\
 $l$                      & Lift height                                                      & $0.10$~m \\
 \midrule
-\multicolumn{3}{l}{\textit{Resolved-rate control}} \\
+\multicolumn{3}{l}{\textit{Resolved-rate control}~\citep{whitney1969resolved}} \\
 $K_p^{\text{pos}}, K_d^{\text{pos}}$ & Position PD gains                                    & $2.0$, $0.05$ \\
 $K_p^{\text{ori}}, K_d^{\text{ori}}$ & Orientation PD gains                                 & $0.9$, $0.04$ \\
 $\tau$                   & Derivative filter time constant                                  & $0.06$~s \\
-$\lambda$                & DLS damping (nominal / near singular)                            & $0.12$ / $0.45$ \\
+$\lambda$                & DLS damping~\citep{chiaverini1994review} (nominal / near singular) & $0.12$ / $0.45$ \\
 $\mu_{\min}$             & Manipulability switch threshold                                  & $0.01$ \\
 $\dot{q}_{\max}$         & Joint-speed saturation                                           & $0.2$~rad/s \\
 --                       & Control loop rate                                                & $10$~Hz \\

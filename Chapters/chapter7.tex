@@ -247,7 +247,7 @@ linear attraction, and continuous repulsion eliminating the traditional threshol
 \centering
 \includegraphics[width=0.75\linewidth]{Images/iapfAllocation/trajectory_comparison.png}
 \caption{Dual-arm trajectories under a near-goal conflict with the tuned weights of this section:
-iAPF (left) against the traditional APF (right)~\citep{sk2025competitive}.}
+iAPF (left) against the traditional APF~\citep{khatib1986real} (right)~\citep{sk2025competitive}.}
 \label{fig:cta_trajcomp}
 \end{figure}
 
@@ -342,10 +342,10 @@ contrast between Figure~\ref{fig:cta_dynhomog} and Figure~\ref{fig:cta_fixedhomo
 \toprule
 \textbf{Method} & \textbf{Scenario} & \textbf{Distance (m)} & \textbf{Time (s)} & \textbf{Velocity (m/s)} \\
 \midrule
-\multirow{2}{*}{Competitive} & Bolt-only & $7.60 \pm 0.082$ & $65.13 \pm 2.01$ & $0.116 \pm 0.003$ \\
+\multirow{2}{*}{Competitive~\citep{sk2025competitive}} & Bolt-only & $7.60 \pm 0.082$ & $65.13 \pm 2.01$ & $0.116 \pm 0.003$ \\
                          & Nut-only  & $7.88 \pm 0.143$ & $67.87 \pm 1.06$ & $0.116 \pm 0.0002$ \\
 \midrule
-\multirow{2}{*}{Fixed}   & Bolt-only & $6.61 \pm 0.016$ & $84.65 \pm 0.13$ & $0.078 \pm 0.0001$ \\
+\multirow{2}{*}{Fixed~\citep{surya2025iapf}}   & Bolt-only & $6.61 \pm 0.016$ & $84.65 \pm 0.13$ & $0.078 \pm 0.0001$ \\
                          & Nut-only  & $6.42 \pm 0.010$ & $82.15 \pm 0.08$ & $0.078 \pm 0.0001$ \\
 \bottomrule
 \end{tabular}
@@ -390,10 +390,10 @@ results of Section~\ref{subsec:cta_simbench}.
 \toprule
 \textbf{Method} & \textbf{Distance (m)} & \textbf{Time (s)} & \textbf{Velocity (m/s)} \\
 \midrule
-Competitive (proposed) & $15.49 \pm 0.226$ & $135.42 \pm 0.485$ & $0.114 \pm 0.001$ \\
-Market-based       & $16.85 \pm 0.315$ & $152.10 \pm 1.450$ & $0.110 \pm 0.002$ \\
-Round-robin        & $18.42 \pm 0.412$ & $175.30 \pm 2.100$ & $0.105 \pm 0.003$ \\
-Fixed (original, partial coverage $\approx 55\%$) & $12.57 \pm 0.181$ & $98.40 \pm 0.800$ & $0.128 \pm 0.001$ \\
+Competitive (proposed)~\citep{sk2025competitive} & $15.49 \pm 0.226$ & $135.42 \pm 0.485$ & $0.114 \pm 0.001$ \\
+Market-based~\citep{quinton2023market}       & $16.85 \pm 0.315$ & $152.10 \pm 1.450$ & $0.110 \pm 0.002$ \\
+Round-robin~\citep{korsah2013comprehensive}        & $18.42 \pm 0.412$ & $175.30 \pm 2.100$ & $0.105 \pm 0.003$ \\
+Fixed (original~\citep{surya2025iapf}, partial coverage $\approx 55\%$) & $12.57 \pm 0.181$ & $98.40 \pm 0.800$ & $0.128 \pm 0.001$ \\
 \bottomrule
 \end{tabular}
 \end{table}

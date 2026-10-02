@@ -450,7 +450,7 @@ Figure~\ref{fig:dikppo_traincurves} shows seed 42.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\linewidth]{Images/dikppo/training_curves.png}
-\caption{Mean terminal reward versus training step for PPO with the dense coupled reward (PPO-D),
+\caption{Mean terminal reward versus training step for PPO~\citep{schulman2017proximal} with the dense coupled reward (PPO-D),
 PPO with a sparse reward (PPO-S), TRPO with the dense reward (TRPO-D), and SAC with dense and
 sparse rewards (SAC-D, SAC-S)~\citep{sk2025diktracking}.}
 \label{fig:dikppo_traincurves}
@@ -498,7 +498,7 @@ rather than any added cost per deployment.
 \toprule
 \textbf{Method} & \textbf{Total timesteps} & \textbf{Wall-clock time} \\
 \midrule
-PPO-D (proposed) & $\approx 5\times10^{8}$   & 1\,h 05\,m 35\,s \\
+PPO-D (proposed)~\citep{schulman2017proximal} & $\approx 5\times10^{8}$   & 1\,h 05\,m 35\,s \\
 PPO-S            & $\approx 3.5\times10^{8}$ & 38\,m 52\,s \\
 TRPO-D           & $\approx 5\times10^{8}$   & 3\,h 14\,m 36\,s \\
 SAC-D            & $\approx 9\times10^{8}$   & 2\,h 52\,m 34\,s \\
@@ -660,14 +660,14 @@ solution into a velocity command.}
 \toprule
 \textbf{Method} & \textbf{Control law} & \textbf{Parameters} \\
 \midrule
-DLS &
+DLS~\citep{chiaverini1994review} &
 $\dot{\boldsymbol{\theta}}=\mathbf{J}^{\top}(\mathbf{J}\mathbf{J}^{\top}+\lambda^{2}\mathbf{I})^{-1}\mathbf{e}$ &
 $\lambda=0.05$; unity gain \\
-Velocity QP &
+Velocity QP~\citep{zhang2013variable} &
 $\min_{\dot{\boldsymbol{\theta}}}\ \tfrac{1}{2}\dot{\boldsymbol{\theta}}^{\top}(\mathbf{I}+\lambda\mathbf{J}^{\top}\mathbf{J})\dot{\boldsymbol{\theta}}-(\mathbf{J}^{\top}\mathbf{e})^{\top}\dot{\boldsymbol{\theta}}$ \newline
 s.t.\ $|\dot{\theta}_i|\le 1$\,rad/s &
 $\lambda=10^{-3}$; OSQP (tol.\ $10^{-4}$, $\le$1000 iter.); zero command if unsolved \\
-TRAC-IK &
+TRAC-IK~\citep{beeson2015trac} &
 Distance solve, then $\dot{\boldsymbol{\theta}}=(\boldsymbol{\theta}_\text{IK}-\boldsymbol{\theta})/\Delta t$, $\Delta t=0.034$\,s &
 $\epsilon=10^{-5}$; 5\,ms timeout; seeded with previous solution; held on failure \\
 \bottomrule
@@ -677,7 +677,7 @@ $\epsilon=10^{-5}$; 5\,ms timeout; seeded with previous solution; held on failur
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/dikppo/circle_comparison.jpg}
-\caption{Circle trajectory comparison: (a) TRAC-IK, (b) DLS, (c) Velocity QP, (d) TRPO-D, (e) SAC-S,
+\caption{Circle trajectory comparison: (a) TRAC-IK~\citep{beeson2015trac}, (b) DLS~\citep{chiaverini1994review}, (c) Velocity QP~\citep{zhang2013variable}, (d) TRPO-D, (e) SAC-S,
 (f) PPO-D~\citep{sk2025diktracking}.}
 \label{fig:dikppo_circlecomp}
 \end{figure}
@@ -685,7 +685,7 @@ $\epsilon=10^{-5}$; 5\,ms timeout; seeded with previous solution; held on failur
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/dikppo/lissajous_comparison.jpg}
-\caption{3-D Lissajous trajectory comparison: (a) TRAC-IK, (b) DLS, (c) Velocity QP, (d) TRPO-D,
+\caption{3-D Lissajous trajectory comparison: (a) TRAC-IK~\citep{beeson2015trac}, (b) DLS~\citep{chiaverini1994review}, (c) Velocity QP~\citep{zhang2013variable}, (d) TRPO-D,
 (e) SAC-S, (f) PPO-D.}
 \label{fig:dikppo_lissajouscomp}
 \end{figure}
@@ -702,15 +702,15 @@ bold~\citep{sk2025diktracking}.}
 \toprule
 \textbf{Method} & \textbf{Curve} & \textbf{Pos. RMSE (m)} & \textbf{Orn. RMSE (rad)} & \textbf{Smoothness (rad/s$^2$)} \\
 \midrule
-\multirow{3}{*}{TRAC-IK} & Circle & 0.001242 & 0.003409 & 54.55 \\
+\multirow{3}{*}{TRAC-IK~\citep{beeson2015trac}} & Circle & 0.001242 & 0.003409 & 54.55 \\
                           & Lemniscate & \textbf{0.001073} & 0.004332 & 52.00 \\
                           & Lissajous & 0.035272 & 0.052286 & 62.16 \\
 \midrule
-\multirow{3}{*}{DLS}     & Circle & 0.016046 & \textbf{0.000767} & 0.0134 \\
+\multirow{3}{*}{DLS~\citep{chiaverini1994review}}     & Circle & 0.016046 & \textbf{0.000767} & 0.0134 \\
                           & Lemniscate & 0.013554 & 0.036097 & 0.0159 \\
                           & Lissajous & 0.027939 & 0.020683 & 0.0222 \\
 \midrule
-\multirow{3}{*}{Velocity QP} & Circle & 0.011013 & 0.002900 & 0.0124 \\
+\multirow{3}{*}{Velocity QP~\citep{zhang2013variable}} & Circle & 0.011013 & 0.002900 & 0.0124 \\
                           & Lemniscate & 0.013254 & 0.003857 & 0.0294 \\
                           & Lissajous & 0.035303 & 0.008647 & 0.0164 \\
 \midrule
@@ -833,7 +833,7 @@ simulation).}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/dikppo/hardware_deployment_baselines.jpg}
-\caption{Real-time hardware deployment of (a) TRAC-IK, (b) DLS, and (c) SAC-S on the circular
+\caption{Real-time hardware deployment of (a) TRAC-IK~\citep{beeson2015trac}, (b) DLS~\citep{chiaverini1994review}, and (c) SAC-S on the circular
 trajectory~\citep{sk2025diktracking}.}
 \label{fig:dikppo_hwbaselines}
 \end{figure}
@@ -865,8 +865,8 @@ bold~\citep{sk2025diktracking}.}
 \toprule
 \textbf{Method} & \textbf{Curve} & \textbf{Pos. RMSE (m)} & \textbf{Orn. RMSE (rad)} \\
 \midrule
-TRAC-IK & Circle & 0.0362 & 0.0770 \\
-DLS     & Circle & 0.0490 & \textbf{0.0021} \\
+TRAC-IK~\citep{beeson2015trac} & Circle & 0.0362 & 0.0770 \\
+DLS~\citep{chiaverini1994review}     & Circle & 0.0490 & \textbf{0.0021} \\
 SAC-S   & Circle & 0.0450 & 0.0590 \\
 \midrule
 \multirow{4}{*}{PPO-D} & Circle & \textbf{0.0063} & 0.0320 \\
@@ -1521,10 +1521,10 @@ unreliable proxy for cooperative task success whenever the base policy dominates
 \midrule 
 \textbf{Method} & \textbf{Reach Succ(\%)} & \textbf{Align Succ(\%)} & \textbf{Rel.Succ(\%)} \\
 \midrule \midrule
-Warmup MAPPO & 88.50$\pm$0.3& 85.80$\pm$0.2 & 96.94$\pm$0.3\\
+Warmup MAPPO~\citep{yu2022surprising} & 88.50$\pm$0.3& 85.80$\pm$0.2 & 96.94$\pm$0.3\\
 \textbf{PPO + MAPPO (ours)} & \textbf{96.50$\pm$0.3} & \textbf{95.0$\pm$0.4} & \textbf{98.45$\pm$0.4}\\
-PPO + IPPO  & 67.50$\pm$0.7& 62.50$\pm$0.9 & 92.60$\pm$1.2\\
-PPO + HAPPO & 92$\pm$0.2 & 87$\pm$0.4 & 94.60$\pm$0.5\\
+PPO + IPPO~\citep{dewitt2020independent}  & 67.50$\pm$0.7& 62.50$\pm$0.9 & 92.60$\pm$1.2\\
+PPO + HAPPO~\citep{kuba2021trust} & 92$\pm$0.2 & 87$\pm$0.4 & 94.60$\pm$0.5\\
 \midrule
 \end{tabular}}
 \vspace{2pt}

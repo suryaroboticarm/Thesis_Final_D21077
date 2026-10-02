@@ -14,7 +14,7 @@ gap G4~\citep{surya2025iapf,sk2025competitive}.
 \centering
 \includegraphics[width=0.85\linewidth]{Images/distanceMonitoring/trajectory_tracking.png}
 \caption{Dual-arm end-effector trajectories through the home, pick, place, and return phases, under
-the traditional artificial potential field controller used to validate that the inter-arm distance
+the traditional artificial potential field controller~\citep{khatib1986real} used to validate that the inter-arm distance
 signal of Chapter~\ref{chap:distance} is directly usable for reactive collision
 avoidance~\citep{sk2025distance}.}
 \label{fig:iapf_baselinetraj}
@@ -78,8 +78,8 @@ manipulation~\citep{surya2025iapf}.}
 \midrule
 Traditional APF~\citep{khatib1986real} & Attractive + repulsive & None & Moderate & Local minima in clutter \\
 Enhanced APF (sampling-based) & Attractive + repulsive + sampling & Statistical ($95.2\%$) & Slow ($9.14$\,s) & High computational overhead \\
-D-APF (UAV navigation) & Exponential + vertical priority & None & Moderate & Limited to UAV applications \\
-Rotating APF & Attractive + rotating repulsive & Mathematical & Moderate & Single arm only, no coordination \\
+D-APF (UAV navigation)~\citep{jayaweera2020dapf} & Exponential + vertical priority & None & Moderate & Limited to UAV applications \\
+Rotating APF~\citep{lin2025robot} & Attractive + rotating repulsive & Mathematical & Moderate & Single arm only, no coordination \\
 \textbf{iAPF (proposed)} & Attractive + repulsive + home-seeking & \textbf{Empirically validated} & \textbf{Fast (10\,Hz)} & Dynamic obstacle adaptation \\
 \bottomrule
 \end{tabular}%
@@ -101,9 +101,9 @@ fastener localization, that does not require a per-pixel segmentation mask.
 \textbf{Model} & \textbf{Model size (MB)} & \textbf{Inference (relative)} \\
 \midrule
 Detectron2 instance segmentation & 351.1 & 0.51 \\
-YOLOv8 instance segmentation     & 20.0  & 15 \\
+YOLOv8 instance segmentation~\citep{yolov8}     & 20.0  & 15 \\
 YOLOv11 instance segmentation    & 6.0   & 13 \\
-\textbf{YOLOv8 OBB}              & \textbf{5.9} & \textbf{20} \\
+\textbf{YOLOv8 OBB}~\citep{yolov8}              & \textbf{5.9} & \textbf{20} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -137,7 +137,7 @@ border) across varying backgrounds and lighting~\citep{surya2025iapf}.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.5\linewidth]{Images/iapf/obb_detection.jpeg}
-\caption{YOLOv8 oriented bounding box prediction around a detected bolt, giving centroid, head
+\caption{YOLOv8~\citep{yolov8} oriented bounding box prediction around a detected bolt, giving centroid, head
 width $h$, shank length $w$, and orientation $\theta$~\citep{surya2025iapf}.}
 \label{fig:iapf_obb}
 \end{figure}

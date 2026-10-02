@@ -540,11 +540,11 @@ Table~\ref{tab:intro_results} collects the headline results.
 \textbf{Study} & \textbf{Metric} & \textbf{Result} \\
 \midrule
 1 & Bolt sorting in simulation                & No misclassifications on overlapping bolts \\
-2 & Segmentation quality (DeepLabV3+)         & mIoU 0.95, best of PPLiteSeg / OCRNet / DeepLabV3+ \\
+2 & Segmentation quality (DeepLabV3+)         & mIoU 0.95, best of PPLiteSeg~\citep{peng2022pp} / OCRNet~\citep{yuan2020object} / DeepLabV3+~\citep{chen2018encoder} \\
 2 & Bolt sorting on real hardware             & No misclassifications and accurate size estimation \\ 
 3 & Run-time role assignment                       & End-to-end in Gazebo/ROS2 and on physical hardware \\
 4 & Inter-arm distance monitoring             & 16 link pairs tracked against a 0.1\,m safety threshold \\
-5 & Vision detection accuracy (YOLOv8 OBB)    & 0.99 bolts / 0.97 nuts at 20 FPS \\
+5 & Vision detection accuracy (YOLOv8 OBB~\citep{yolov8})    & 0.99 bolts / 0.97 nuts at 20 FPS \\
 6 & Velocity improvement over fixed allocation & $\approx$47\% (homogeneous), zero collisions \\
 6 & Mixed-object overhead                     & $\approx$11\%, offset by superior safety margins \\
 7 & Zero-shot trajectory generalization       & Circle, square, lemniscate, 3-D Lissajous at 20\,Hz \\
@@ -614,13 +614,13 @@ studies in this thesis.
 \textbf{\#} & \textbf{Theme} & \textbf{Core method} & \textbf{Platform / validation} & \textbf{Gap} \\
 \midrule
 1 & Perception        & $k$-means + Oriented Chamfer matching on RGB-D & Gazebo (ROS1), Kinova Gen3 Lite & G1 \\
-2 & Perception        & DeepLabV3+ segmentation + classical vision, depth fusion & Hardware, RealSense D415 & G1 \\
-3 & Dual-arm coordination & Eye-in-hand ArUco search, reachability role assignment & Gazebo/ROS2 + dual-arm hardware & G2 \\
+2 & Perception        & DeepLabV3+~\citep{chen2018encoder} segmentation + classical vision, depth fusion & Hardware, RealSense D415 & G1 \\
+3 & Dual-arm coordination & Eye-in-hand ArUco~\citep{garrido2014automatic} search, reachability role assignment & Gazebo/ROS2 + dual-arm hardware & G2 \\
 4 & Safety            & Line-segment kinematic inter-arm distance matrix & Dual Kinova Gen3 Lite hardware & G3 \\
-5 & Motion planning   & iAPF with PD angular control, empirical validation & Hardware, YOLOv8 OBB at 20 FPS & G4 \\
+5 & Motion planning   & iAPF with PD angular control, empirical validation & Hardware, YOLOv8 OBB~\citep{yolov8} at 20 FPS & G4 \\
 6 & Task allocation   & Competitive allocation, temporal proposal windows & Dual-arm hardware & G5 \\
-7 & Learned control   & PPO differential IK, coupled reward & Sim-to-real, Kinova Gen3 Lite at 20\,Hz & G6 \\
-8 & Learned control   & MAPPO with adaptive gating over a frozen PPO prior & Sim-to-real, CPU-only deployment at 20 Hz & G7 \\
+7 & Learned control   & PPO~\citep{schulman2017proximal} differential IK, coupled reward & Sim-to-real, Kinova Gen3 Lite at 20\,Hz & G6 \\
+8 & Learned control   & MAPPO~\citep{yu2022surprising} with adaptive gating over a frozen PPO prior & Sim-to-real, CPU-only deployment at 20 Hz & G7 \\
 \bottomrule
 \end{tabular}%
 }
