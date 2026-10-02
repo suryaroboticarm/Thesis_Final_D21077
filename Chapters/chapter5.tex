@@ -45,19 +45,35 @@ transform expressing arm $i$'s base frame in that reference (with $T^{B_1}_{B_1}
 of joint $k$ of arm $i$ in the shared reference frame is
 \begin{equation}
 \mathbf{p}_i^k = T^{B_1}_{B_i}\, T^{B_i}_{k}(\mathbf{q}_i)\, \begin{bmatrix} 0 \\ 0 \\ 0 \\ 1 \end{bmatrix}
-\in \mathbb{R}^3.
+\in \mathbb{R}^3, \qquad k = 1, \ldots, m_i.
 \label{eq:dm_jointpos}
 \end{equation}
-Each physical link of arm $i$, between consecutive joints $k-1$ and $k$, is modelled as the line
-segment
+Throughout, the product of a homogeneous transform with $[0,0,0,1]^\top$ is understood to be
+truncated to its leading three components, and the truncation operator is omitted wherever the
+codomain $\mathbb{R}^3$ is stated. All joints are taken to be revolute, consistent with the
+single-DOF parameterization $T^{k-1}_{k}(q_i^k)$; a prismatic joint would require the substitution
+$d_k \mapsto d_k(q_i^k)$ in the Denavit--Hartenberg table of Section~\ref{sec:dm_dualarm}.
+
+The segment spanning the first link of each arm starts at the arm's base origin, which is the
+$k=0$ instance of Equation~\eqref{eq:dm_jointpos} with $T^{B_i}_{0} = I_4$:
+\begin{equation}
+\mathbf{p}_i^{0} = T^{B_1}_{B_i}\begin{bmatrix} 0 \\ 0 \\ 0 \\ 1 \end{bmatrix} = \mathbf{p}^{B_1}_{B_i} \in \mathbb{R}^3,
+\label{eq:dm_baseanchor}
+\end{equation}
+the translation block of $T^{B_1}_{B_i}$ (so $\mathbf{p}_1^0 = \mathbf{0}$). Consequently arm $i$
+contributes exactly $m_i$ segments, from the base to $J_1$, $J_1$ to $J_2$, and so on up to
+$J_{m_i}$. Each physical link of arm $i$, between consecutive joints $k-1$ and $k$, is modelled as
+the line segment
 \begin{equation}
 L_i^k = \left\{ \mathbf{p}_i^{k-1} + t\left( \mathbf{p}_i^k - \mathbf{p}_i^{k-1} \right) \;\middle|\; t \in [0,1] \right\},
 \label{eq:dm_segment}
 \end{equation}
 and the complete set of link segments across all $N$ arms is
-$\mathcal{S} = \{ L_i^k \mid i \in [1,N],\, k \in [1,m_i] \}$.
-
-where ${S}$ is set of all link segments, $L_i^k$ is segment $k$ of arm $i$ and $m_{i}$ is total joints in arm i.
+$\mathcal{S} = \{ L_i^k \mid i \in [1,N],\, k \in [1,m_i] \}$, where $L_i^k$ is segment $k$ of arm $i$
+and $m_i$ is the total number of joints (hence segments) of arm $i$. A segment is the centreline of
+its link, so every distance computed in this chapter is a centreline distance; the physical clearance
+between links of radii $r_i$ and $r_l$ is $d - r_i - r_l$, and any safety threshold applied to $d$
+must include this margin.
 
 \noindent\textbf{Indexing of the Segment Set:} To address the segments of a heterogeneous multi-arm system, in which the joint counts $m_i$ need not be equal, the total segment count and the cumulative arm offset are defined as
 \begin{equation}
@@ -71,10 +87,10 @@ The flattening map $\varphi$ and its inverse are then
 \label{phi_map}
 \end{equation}
 \begin{equation}
-i = \max\left\{\, q \in \{1,\ldots,N\} \;\middle|\; \sigma_q < \alpha \,\right\}, \quad k = \alpha - \sigma_i
+i = \max\left\{\, q \in \{1,\ldots,N\} \;\middle|\; \sigma_q < \mu \,\right\}, \quad k = \mu - \sigma_i
 \label{phi_inv}
 \end{equation}
-so that $L_\alpha \triangleq L_i^k$ where $(i,k) = \varphi^{-1}(\alpha)$, and the arm-membership function $\rho(\alpha)$ returns the arm index $i$ of segment $\alpha$, satisfying $\rho(\varphi(i,k)) \equiv i$. The map $\varphi$ is a bijection onto $\{1,\ldots,M\}$, and the set in Eq.~\ref{phi_inv} is non-empty for every $\alpha \geq 1$ because $\sigma_1 = 0$, so $\varphi^{-1}$ is defined on the whole index range. For the dual-arm system of Section.~\ref{sec:dm_dualarm}, $\varphi(1,4) = 4$ addresses left arm joint 4 and $\varphi(2,4) = 10$ addresses right arm joint 4.
+so that $L_\mu \triangleq L_i^k$ where $(i,k) = \varphi^{-1}(\mu)$, and the arm-membership function $\rho(\mu)$ returns the arm index $i$ of segment $\mu$, satisfying $\rho(\varphi(i,k)) \equiv i$. The map $\varphi$ is a bijection onto $\{1,\ldots,M\}$, and the set in Eq.~\ref{phi_inv} is non-empty for every $\mu \geq 1$ because $\sigma_1 = 0$, so $\varphi^{-1}$ is defined on the whole index range. For the dual-arm system of Section.~\ref{sec:dm_dualarm}, $\varphi(1,4) = 4$ addresses left arm joint 4 and $\varphi(2,4) = 10$ addresses right arm joint 4.
 
 %% ============================================================
 \section{Classification of Link Configurations}\label{sec:dm_classification}
@@ -87,15 +103,27 @@ $\mathbf{c} = \mathbf{u} \times \mathbf{v}$. Every pair of segments in $\mathbb{
 exactly one of three geometric configurations, tested with numerical tolerance
 $\varepsilon = 10^{-6}$:
 \begin{enumerate}
-    \item \textbf{Parallel:} $\lVert \mathbf{c} \rVert < \varepsilon$.
-    \item \textbf{Intersecting:} $\lVert \mathbf{c} \rVert \geq \varepsilon$ and
-    $\lVert \mathbf{c} \times \mathbf{w} \rVert < \varepsilon$.
-    \item \textbf{Skew:} $\lVert \mathbf{c} \rVert \geq \varepsilon$ and
-    $\lVert \mathbf{c} \times \mathbf{w} \rVert \geq \varepsilon$.
+    \item \textbf{Parallel:} $\lVert \mathbf{c} \rVert < \varepsilon\,\lVert \mathbf{u} \rVert \lVert \mathbf{v} \rVert$,
+    i.e.\ $\sin\theta < \varepsilon$ for the angle $\theta$ between the directions.
+    \item \textbf{Intersecting:} not parallel, and $\lvert \mathbf{c} \cdot \mathbf{w} \rvert / \lVert \mathbf{c} \rVert < \varepsilon$.
+    \item \textbf{Skew:} not parallel, and $\lvert \mathbf{c} \cdot \mathbf{w} \rvert / \lVert \mathbf{c} \rVert \geq \varepsilon$.
 \end{enumerate}
-This classification determines which closed-form distance computation applies, avoiding the
-degenerate cases (parallel or intersecting directions) that a single general-purpose formula would
-need special-case handling for.
+The scalar triple product $\mathbf{c} \cdot \mathbf{w} = (\mathbf{u} \times \mathbf{v}) \cdot \mathbf{w}$
+vanishes exactly when the offset $\mathbf{w}$ lies in the plane spanned by the two directions, which is
+the coplanarity condition for the two supporting lines; for non-parallel lines, coplanarity is
+equivalent to intersection. Dividing by $\lVert \mathbf{c} \rVert$ gives
+$\lvert \mathbf{c} \cdot \mathbf{w} \rvert / \lVert \mathbf{c} \rVert$, which is the distance between the two
+supporting lines, so both tolerances are scale-invariant (dimensionless and in metres respectively)
+rather than depending on the link lengths. The parallel test is not an independent heuristic: the
+determinant of the linear system in Equation~\eqref{eq:dm_skew} equals
+$\lVert \mathbf{u} \rVert^2 \lVert \mathbf{v} \rVert^2 - (\mathbf{u} \cdot \mathbf{v})^2 = \lVert \mathbf{c} \rVert^2$,
+so the parallel test is precisely the guard against an ill-conditioned solve. A degenerate segment
+with $\lVert \mathbf{u} \rVert < \varepsilon$ or $\lVert \mathbf{v} \rVert < \varepsilon$ is treated as a point, and its
+distance is the point-to-segment distance of Equation~\eqref{eq:dm_pointseg}.
+
+Only the parallel case is genuinely degenerate for the closed forms below; the intersecting class is
+retained because it separates the exact-contact case, but the skew formula of
+Equation~\eqref{eq:dm_skew} already returns zero for any crossing, non-parallel pair.
 
 %% ============================================================
 \section{Minimum-Distance Computation}\label{sec:dm_distance}
@@ -104,16 +132,29 @@ need special-case handling for.
 The distance function $d : \mathcal{S} \times \mathcal{S} \to \mathbb{R}^{+}$ is non-negative,
 $d(L_1, L_2) \geq 0$; symmetric, $d(L_1, L_2) = d(L_2, L_1)$; identical, $d(L, L) = 0$; and continuous
 in the segment endpoints. Its closed form depends on the classification of
-Section~\ref{sec:dm_classification}.
-
-\textbf{Parallel segments.} The distance reduces to the perpendicular offset between the two
-parallel lines, clipped by the segments' finite extent:
+Section~\ref{sec:dm_classification}. All three cases share the point-to-segment distance
 \begin{equation}
-d_P(L_1, L_2) = \min\left\{ \lVert \operatorname{proj}_{\perp}(\mathbf{w}) \rVert,\; \text{endpoint distances} \right\},
+d(\mathbf{p}, L) = \min_{t \in [0,1]} \lVert \mathbf{p} - \mathbf{a}_1 - t\,\mathbf{u} \rVert
+\label{eq:dm_pointseg}
+\end{equation}
+and the endpoint distance
+\begin{equation}
+d_E(L_1, L_2) = \min\{ d(\mathbf{a}_1, L_2),\, d(\mathbf{a}_2, L_2),\,
+d(\mathbf{b}_1, L_1),\, d(\mathbf{b}_2, L_1) \},
+\label{eq:dm_endpoint}
+\end{equation}
+the minimum point-to-segment distance over the four endpoints.
+
+\textbf{Parallel segments.} The closest points are not unique, and the perpendicular offset between
+the supporting lines is the distance only when the segments overlap along their common direction;
+for non-overlapping segments it underestimates the distance (two collinear segments with a gap have
+zero perpendicular offset). The correct distance is therefore the endpoint distance,
+\begin{equation}
+d_P(L_1, L_2) = d_E(L_1, L_2),
 \label{eq:dm_parallel}
 \end{equation}
-where $\operatorname{proj}_{\perp}(\mathbf{w})$ is the component of $\mathbf{w}$ perpendicular to
-both $\mathbf{u}$ and $\mathbf{v}$.
+which equals the perpendicular offset $\lVert \operatorname{proj}_{\perp}(\mathbf{w}) \rVert$ whenever
+the segments overlap, because at least one endpoint then projects inside the other segment.
 
 \textbf{Intersecting segments.} Solving the linear system
 \begin{equation}
@@ -122,11 +163,10 @@ both $\mathbf{u}$ and $\mathbf{v}$.
 \end{equation}
 for the parameters $s, t$ at which the two infinite lines meet: if the intersection lies on both
 segments, $s, t \in [0,1]$, then $d_I(L_1, L_2) = 0$; otherwise the intersection point lies outside
-at least one segment and $d_I(L_1, L_2) = \min\{ d(\mathbf{a}_1, L_2),\, d(\mathbf{a}_2, L_2),\,
-d(\mathbf{b}_1, L_1),\, d(\mathbf{b}_2, L_1) \}$, the minimum point-to-segment distance over the four
-endpoints.
+at least one segment and $d_I(L_1, L_2) = d_E(L_1, L_2)$.
 
-\textbf{Skew segments.} The closest points $\mathbf{p}^* \in L_1$ and $\mathbf{q}^* \in L_2$ satisfy
+\textbf{Skew segments.} Minimizing $\lVert s\mathbf{u} - t\mathbf{v} - \mathbf{w} \rVert^2$ over the
+supporting lines gives the closest points $\mathbf{p}^* \in L_1$ and $\mathbf{q}^* \in L_2$ through
 \begin{equation}
 \begin{bmatrix} \mathbf{u}\cdot\mathbf{u} & -\mathbf{u}\cdot\mathbf{v} \\
 -\mathbf{u}\cdot\mathbf{v} & \mathbf{v}\cdot\mathbf{v} \end{bmatrix}
@@ -135,9 +175,10 @@ endpoints.
 \label{eq:dm_skew}
 \end{equation}
 and if $s^*, t^* \in [0,1]$, then $d_S(L_1, L_2) = \lVert \mathbf{p}^* - \mathbf{q}^* \rVert$;
-otherwise the closest approach of the infinite lines falls outside one or both segments and the
-distance is instead computed from the relevant endpoint. This is the case that dominates in
-practice: two manipulator links sharing a workspace are generically neither parallel nor
+otherwise $d_S(L_1, L_2) = d_E(L_1, L_2)$. The fallback is exact: the objective is a convex quadratic
+in $(s,t)$, so when its unconstrained minimizer lies outside $[0,1]^2$ the constrained minimizer lies
+on the boundary of the square, where one parameter is an endpoint value. This is the case that
+dominates in practice: two manipulator links sharing a workspace are generically neither parallel nor
 intersecting, so most segment pairs fall here rather than into the two special cases above.
 
 %% ============================================================
@@ -147,41 +188,25 @@ intersecting, so most segment pairs fall here rather than into the two special c
 The need for a unified representation that captures all inter-arm distances while achieving efficient computation. The distance matrix is,
 \begin{equation}
 {D} \in \overline{\mathbf{R}}^{\,M \times M}, \quad
-D[\alpha,\beta] =
+D[\mu,\nu] =
 \begin{cases}
-d(L_{\alpha}, L_{\beta}), & \rho(\alpha) \neq \rho(\beta)\\
-+\infty, & \rho(\alpha) = \rho(\beta)
+d(L_{\mu}, L_{\nu}), & \rho(\mu) \neq \rho(\nu)\\
++\infty, & \rho(\mu) = \rho(\nu)
 \end{cases}
 \label{dist_matrix}
 \end{equation}
-where $\overline{\mathbf{R}} = \mathbf{R} \cup \{+\infty\}$. The sentinel value is $+\infty$ rather than zero: since $d(L,L) = 0$ by the identity property, an unevaluated entry initialized to zero would be returned by the global minimum as a spurious collision. The matrix is symmetric, because $d$ is symmetric and the membership test $\rho(\alpha) \neq \rho(\beta)$ is itself symmetric.
+where $\overline{\mathbf{R}} = \mathbf{R} \cup \{+\infty\}$. The sentinel value is $+\infty$ rather than zero: since $d(L,L) = 0$ by the identity property, an unevaluated entry initialized to zero would be returned by the global minimum as a spurious collision. The matrix is symmetric, because $d$ is symmetric and the membership test $\rho(\mu) \neq \rho(\nu)$ is itself symmetric.
 
-\noindent\textbf{Scope:} $D$ is strictly an inter-arm proximity matrix. Intra-arm self-collision is precluded by the joint-limit constraints of the individual manipulator and lies outside the present formulation.
-
-\noindent The elements of ${D[\alpha, \beta]}$ denotes the minimum distance between the segments $\alpha$ and $\beta$ infers proximity database that can be asked for any pair of segments. The distances between intra-arm links are skipped for the computational efficiency, focusing on inter-arm distances as shown in Eq. \ref{eq:dm_intermatrix}.
-
-% Let $\varphi : \{(i,k) \mid i \in [1,N],\, k \in [1,m_i]\} \to \left[1, |\mathcal{S}|\right]$ be a
-% fixed bijective index assigning a single linear index to each (arm, link) pair. The unified distance
-% matrix is
+\noindent\textbf{Scope:} $D$ is strictly an inter-arm proximity matrix; intra-arm self-collision lies outside the present formulation. Adjacent links of one arm share a joint and are trivially non-colliding, and the remaining same-arm pairs are skipped for computational efficiency, so only the inter-arm entries
 \begin{equation}
-D \in \mathbb{R}^{|\mathcal{S}| \times |\mathcal{S}|}, \qquad D[\varphi(i,k),\, \varphi(l,m)] = d(L_i^k, L_l^m),
-\label{eq:dm_fullmatrix}
-\end{equation}
-% so that $D$ is a proximity database that can be queried for the minimum distance between any two
-% segments, from any two arms, without recomputation. Because links belonging to the same arm are
-% already governed by that arm's own joint limits and self-collision checks, and because adjacent
-% links share a joint and are trivially non-colliding, the distance matrix used for cross-arm
-% monitoring is restricted to inter-arm pairs,
-\begin{equation}
-D\left[ \varphi(i,k),\, \varphi(l,m) \right] \quad \text{where } i \neq l,
+D\left[ \varphi(i,k),\, \varphi(l,n) \right] \quad \text{where } i \neq l,
 \label{eq:dm_intermatrix}
 \end{equation}
-which is both the physically relevant quantity for inter-arm collision avoidance and, by excluding
-same-arm pairs, the computationally cheaper one.
+are evaluated. The element $D[\mu,\nu]$ is the minimum distance between segments $\mu$ and $\nu$, so $D$ acts as a proximity database that can be queried for any inter-arm segment pair without recomputation.
 
 \noindent\textbf{Block Structure:} Grouping the entries of Eq.~\ref{dist_matrix} by arm index yields the inter-arm block
 \begin{equation}
-D_{il} \in \overline{\mathbf{R}}^{\,m_i \times m_l}, \quad D_{il}[k,m] = d(L_i^{\,k}, L_l^{\,m}), \quad i \neq l
+D_{il} \in \overline{\mathbf{R}}^{\,m_i \times m_l}, \quad D_{il}[k,n] = d(L_i^{\,k}, L_l^{\,n}), \quad i \neq l
 \label{block_eq}
 \end{equation}
 so that $D$ admits the partition
@@ -195,16 +220,16 @@ D_{1N}^{T} & D_{2N}^{T} & \cdots & \boldsymbol{\infty}
 \end{bmatrix}
 \label{block_partition}
 \end{equation}
-with $\binom{N}{2}$ populated off-diagonal blocks and $N$ null diagonal blocks. The blocks satisfy $D_{li} = D_{il}^{T}$, since $D_{li}[k, m] = d(L_l^{\,m},L_i^{\,k}) = d(L_i^{\,k},L_l^{\,m}) = D_{il}[k,m]$ by the symmetry of $d$; hence only the pairs $i < k$ need be evaluated. The minimum inter-arm distance of the system follows as
+with $\binom{N}{2}$ populated upper-triangular blocks and $N$ diagonal blocks filled with the sentinel $+\infty$. The blocks satisfy $D_{li} = D_{il}^{T}$, since $D_{li}[n, k] = d(L_l^{\,n},L_i^{\,k}) = d(L_i^{\,k},L_l^{\,n}) = D_{il}[k,n]$ by the symmetry of $d$; hence only the pairs $i < l$ need be evaluated. The minimum inter-arm distance of the system follows as
 \begin{equation}
-d_{\min} = \min_{1 \leq i < k \leq N} \min\left( D_{ik} \right) = \min_{\alpha,\beta} D[\alpha,\beta]
+d_{\min} = \min_{1 \leq i < l \leq N} \min\left( D_{il} \right) = \min_{\mu,\nu} D[\mu,\nu]
 \label{dmin_eq}
 \end{equation}
-For $N \geq 3$, the individual block minima $\min(D_{ik})$ are available per arm pair in addition to the global minimum of Eq.~\ref{dmin_eq}.
+For $N \geq 3$, the individual block minima $\min(D_{il})$ are available per arm pair in addition to the global minimum of Eq.~\ref{dmin_eq}.
 
 \noindent\textbf{Computational Cost:} Forward kinematics is accumulated incrementally at $O(M)$, and every branch of the distance computation terminates in a bounded number of dot and cross products together with one $2\times2$ solve, so the per-pair cost is $O(1)$. The number of evaluated pairs under the constraint of Eq.~\ref{block_eq}, with the block symmetry exploited, is
 \begin{equation}
-P = \sum_{1 \leq i < k \leq N} m_i m_k = \frac{1}{2}\left( M^2 - \sum_{i=1}^{N} m_i^2 \right)
+P = \sum_{1 \leq i < l \leq N} m_i m_l = \frac{1}{2}\left( M^2 - \sum_{i=1}^{N} m_i^2 \right)
 \label{pair_count}
 \end{equation}
 giving a total cost of $O(M^2) = O(N^2 m^2)$ for equal joint counts. For $N = 2$ and $m = 6$ this evaluates to $P = 36$, matching the block size of Eq.~\ref{eq:dm_interarm}. The cost is independent of the configuration, so the method admits a hard worst-case bound, and all $P$ evaluations are mutually independent and therefore parallelizable.
@@ -217,7 +242,7 @@ giving a total cost of $O(M^2) = O(N^2 m^2)$ for equal joint counts. For $N = 2$
 The general $N$-arm framework above is specialized to the table-mounted dual-arm system used
 throughout this thesis: $N = 2$, arms $\mathcal{A}_L$ and $\mathcal{A}_R$ as in
 Chapter~\ref{chap:shared_vision}, each with $m_L = m_R = 6$ joints (a Kinova Gen3 Lite), separated
-by a fixed base-to-base distance and related by the calibrated inter-arm transform $T^{B_L}_{B_R}$
+by a fixed base-to-base distance $L = 0.76$\,m and related by the calibrated inter-arm transform $T^{B_L}_{B_R}$
 of Section~\ref{sec:sv_relay} (Figure~\ref{fig:dm_setup}). Table~\ref{tab:dm_dh} lists the
 Denavit--Hartenberg parameters used to compute each arm's joint positions via
 Equation~\eqref{eq:dm_jointpos}.
@@ -248,18 +273,48 @@ $J_6$ & 0       & 0.0   & 0.235  & $\theta_6 + \pi/2$ \\
 \end{tabular}
 \end{table}
 
-With both arms sharing $B_L$ as the reference frame, the inter-arm distance matrix restricted by
-Equation~\eqref{eq:dm_intermatrix} to the six links of each arm is
+With both arms sharing $B_L$ as the reference frame, and taking the left arm as arm $1$ and the right
+arm as arm $2$, the inter-arm distance matrix of Equation~\eqref{eq:dm_intermatrix} over the six links
+of each arm is
 \begin{equation}
-D_{\text{inter}} \in \mathbb{R}^{6 \times 6}, \qquad D_{\text{inter}}[k,m] = d(L_L^k, L_R^m).
+D_{\text{inter}} \in \overline{\mathbf{R}}^{\,6 \times 6}, \qquad D_{\text{inter}}[k,n] = d(L_L^k, L_R^n).
 \label{eq:dm_interarm}
 \end{equation}
-In practice, the base separation between the two table-mounted manipulators means the first two
-links of each arm, closest to the base, can never approach the other arm closely enough to collide
-during normal table operation. Excluding these from the monitored set reduces
-Equation~\eqref{eq:dm_interarm} to $D_{\text{inter}} \in \mathbb{R}^{4 \times 4}$, covering links 3
-through 6 of each arm, sixteen monitored link pairs in total, without loss of the pairs that can
-actually collide.
+This is precisely the single off-diagonal block $D_{12}$ of the partition in
+Equation~\eqref{block_partition}, so the dual-arm matrix is an instance of the general formulation
+rather than a separate construction, and Equation~\eqref{dmin_eq} reduces to
+$d_{\min} = \min(D_{12})$ for $N = 2$.
+
+\noindent\textbf{Active-Set Reduction:} Let $\mathcal{V}_i^{\,k} \subset \mathbb{R}^3$ denote the
+volume swept by segment $L_i^{\,k}$ over the admissible joint range of arm $i$, and let $\delta \geq 0$
+be the safety threshold applied to $d$. The pair-specific active set is
+\begin{equation}
+A_{il} = \left\{\, k \in [1,m_i] \;\middle|\; \exists\, n \in [1,m_l] :
+\operatorname{dist}\!\left(\mathcal{V}_i^{\,k}, \mathcal{V}_l^{\,n}\right) \leq \delta \,\right\}
+\label{eq:dm_activeset}
+\end{equation}
+and only the reduced block $\tilde{D}_{il} \in \overline{\mathbf{R}}^{\,|A_{il}| \times |A_{li}|}$ need be
+evaluated. The set is defined per arm pair rather than per arm, since a link that can approach one
+arm need not be able to approach another; the two index sets may differ in size, so $\tilde{D}_{il}$
+is rectangular in general. Because $\mathcal{V}$ is swept over the full admissible joint range, the
+exclusion is configuration-independent,
+\begin{equation}
+k \notin A_{il} \implies d(L_i^{\,k}, L_l^{\,n}) > \delta \quad \forall\, n \in [1,m_l], \; \forall\, \mathbf{q}_i, \mathbf{q}_l .
+\label{eq:dm_activecert}
+\end{equation}
+The reduction is therefore exact for the decision $d_{\min} \leq \delta$, and with $\delta = 0$ it is
+exact for collision detection. It is not exact for the \emph{value} of $d_{\min}$: an excluded pair
+has $d > \delta$, so the reduced minimum can exceed the true one whenever the closest pair was
+excluded.
+
+For the table-mounted system, the base separation $L = 0.76$\,m is of the order of the manipulator's
+reach, so the first two links of each arm, closest to the base, do not approach the other arm during
+table operation. This gives $A_{12} = A_{21} = \{3,4,5,6\}$ and reduces
+Equation~\eqref{eq:dm_interarm} to $\tilde{D}_{12} \in \overline{\mathbf{R}}^{\,4 \times 4}$ over the
+critical link pairs L3--L6 and R3--R6, sixteen monitored pairs in total. This particular set rests on
+the operating assumption that both end-effectors work over the table between the arms, rather than on
+the full joint range, since at full stretch the reach is comparable to $L$; the swept-volume
+certificate of Equation~\eqref{eq:dm_activecert} holds for it only within that restricted workspace.
 
 Algorithm~\ref{alg:dm_collision} summarizes the complete computation, from joint feedback to the
 minimum inter-arm distance, executed once per control cycle.
@@ -268,21 +323,26 @@ minimum inter-arm distance, executed once per control cycle.
 \caption{Multi-Arm Collision Distance Computation}
 \label{alg:dm_collision}
 \begin{algorithmic}[1]
-\REQUIRE Joint configurations $\{\mathbf{q}_1, \mathbf{q}_2, \ldots, \mathbf{q}_N\}$
+\REQUIRE Joint configurations $\{\mathbf{q}_1, \mathbf{q}_2, \ldots, \mathbf{q}_N\}$, active sets $A_{il}$
 \ENSURE Minimum distance between any pair of segments from different arms
 \FOR{each arm $i$}
     \STATE Compute $\mathbf{p}_i^k = T^{B_1}_{B_i}\, T^{B_i}_{k}(\mathbf{q}_i)\, [0,0,0,1]^\top$ for
-    every joint $k$ (Equation~\eqref{eq:dm_jointpos})
+    every joint $k = 0, \ldots, m_i$ (Equations~\eqref{eq:dm_jointpos} and~\eqref{eq:dm_baseanchor})
 \ENDFOR
-\STATE Initialize $D_{\text{inter}} \in \mathbb{R}^{6 \times 6}$
-\FOR{each segment pair $(L_i^k, L_l^m)$ with $i \neq l$}
+\STATE Initialize $D \in \overline{\mathbf{R}}^{\,M \times M}$ with $D[\mu,\nu] \leftarrow +\infty$
+\FOR{$i = 1$ to $N-1$}
+\FOR{$l = i+1$ to $N$}
+\FOR{each segment pair $(L_i^k, L_l^n)$ with $k \in A_{il}$, $n \in A_{li}$}
     \STATE Classify the geometric configuration: parallel, intersecting, or skew
     (Section~\ref{sec:dm_classification})
-    \STATE Compute $d(L_i^k, L_l^m)$ using the corresponding closed form
+    \STATE Compute $d(L_i^k, L_l^n)$ using the corresponding closed form
     (Section~\ref{sec:dm_distance})
-    \STATE Store $d(L_i^k, L_l^m)$ in $D_{\text{inter}}[k,m]$
+    \STATE Store $D[\varphi(i,k), \varphi(l,n)] \leftarrow d(L_i^k, L_l^n)$ and set
+    $D[\varphi(l,n), \varphi(i,k)] \leftarrow D[\varphi(i,k), \varphi(l,n)]$
 \ENDFOR
-\RETURN $\min(D_{\text{inter}})$
+\ENDFOR
+\ENDFOR
+\RETURN $\min_{\mu,\nu} D[\mu,\nu]$
 \end{algorithmic}
 \end{algorithm}
 
@@ -296,7 +356,7 @@ arms connected via Ethernet to a single control PC and accessed through the Kino
 Twist (end-effector velocity) control drove the two arms toward pick targets of
 $[0.385, 0.045, -0.01]$\,m (LEFT) and $[0.327, 0.050, -0.01]$\,m (RIGHT), while
 Algorithm~\ref{alg:dm_collision} computed the inter-arm distance matrix continuously for all sixteen
-monitored link pairs, against an arbitrary safety threshold of $0.1$\,m.
+monitored link pairs, against an arbitrary safety threshold of $0.1$\,m on the centreline distance.
 
 \begin{figure}[htbp]
 \centering
@@ -327,7 +387,7 @@ observed between link pairs L4--R4 and L5--R4, dropping to $0.243$\,m and $0.259
 $T = 33\%$, both comfortably above the $0.1$\,m threshold.
 
 The line-segment kinematic model developed in this chapter provides exactly that: a continuous,
-differentiable-in-principle distance signal, computed from joint feedback alone, restricted to the
+Lipschitz distance signal (differentiable almost everywhere, though not where closest points are non-unique, as for parallel links), computed from joint feedback alone, restricted to the
 inter-arm pairs that can actually collide. Chapter 6 builds directly on this signal, coupling the
 distance $D_{\text{inter}}$ derived in this chapter to a velocity-aware collision-avoidance
 controller, the improved artificial potential field (iAPF) framework that addresses gap G4, for
