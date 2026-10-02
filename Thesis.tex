@@ -129,25 +129,25 @@
 %% ============================================================
 %%  Front matter
 %% ============================================================
-% \frontmatter
+\frontmatter
 \maketitle                       % Title page
 
 \dedication[Dedicated to my beloved wife (Spandana Racherla), my son (Yesho Shreyansh S.K), and all my teachers.]           % Dedication
 
-% \include{frontmatter/dec}        % Declaration
+\include{frontmatter/dec}        % Declaration
 
-% \include{frontmatter/ack}        % Acknowledgements
+\include{frontmatter/ack}        % Acknowledgements
 
-% \include{frontmatter/abs}        % Abstract
+\include{frontmatter/abs}        % Abstract
 
 \begin{contentlist}              % Tables of contents
-% \tableofcontents                 % Table of contents
-% \listoffigures                   % List of figures
-% \listoftables                    % List of tables
+\tableofcontents                 % Table of contents
+\listoffigures                   % List of figures
+\listoftables                    % List of tables
 \end{contentlist}
 
-% \include{frontmatter/acronyms}   % List of Acronyms
-% \include{frontmatter/symbols}    % List of Symbols
+\include{frontmatter/acronyms}   % List of Acronyms
+\include{frontmatter/symbols}    % List of Symbols
 
 %% ============================================================
 %%  Main matter
@@ -168,15 +168,15 @@
 %%  Appendices
 %% ============================================================
 \appendix
-% \include{backmatter/app1}
-% \include{backmatter/app2}
-% \include{backmatter/app4}
-% \include{backmatter/app5}
+\include{backmatter/app1}
+\include{backmatter/app2}
+\include{backmatter/app4}
+\include{backmatter/app5}
 
 %% ============================================================
 %%  Back matter
 %% ============================================================
-% \backmatter
+\backmatter
 \bibliographystyle{apalike}
 \bibliography{References/thesis_refs} % trigger bibtex rerun
 \include{backmatter/pub}         % List of publications
