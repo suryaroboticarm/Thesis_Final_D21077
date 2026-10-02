@@ -20,7 +20,7 @@ coupled-reward PPO controller that maps instantaneous Cartesian pose error direc
 velocity commands, trained purely on static reachable poses, and shown to generalize zero-shot to
 four continuous trajectory geometries on real hardware, closing gap G6. That trained policy is then
 reused, frozen, as the single-arm prior inside Sections~\ref{sec:alpha_formulation}
-through~\ref{sec:alpha_results}, which present ALPHA, an adaptive hierarchical blending
+through~\ref{sec:alpha_results}, which present Gated Prior Composition (GPC), a hierarchical
 architecture that layers a learned multi-agent coordination policy on top of the frozen prior
 through a gating scalar co-trained with it from timestep zero, closing gap G7 without requiring the
 coordination policy to relearn reachability from scratch.
@@ -41,14 +41,36 @@ under continuous tracking; heuristic solvers such as FABRIK~\citep{aristidou2011
 to position reaching; and the closed-form polynomial solution available for the Kinova Gen3
 Lite~\citep{zohour2021kinova} has no mechanism to prefer the joint configuration nearest the
 previous one, so it can jump between valid but discontinuous solutions under sub-millisecond
-tracking. Velocity-level controllers, resolved-rate motion control~\citep{whitney1969resolved},
-damped least squares~\citep{wampler1986manipulator,chiaverini1994review}, and quadratic
+tracking. Practical implementations mitigate this in three ways, each with a trade-off rather than a
+cure: seeding every solve with the previous solution keeps consecutive solutions on one branch only
+while competing branches remain well separated, which cannot be guaranteed near singular
+configurations~\citep{beeson2015trac,dai2019global}; limiting the commanded joint velocity bounds the
+size of a discontinuity but not the branch change itself, and trades it for a tracking
+lag~\citep{faroni2018predictive}; and trajectory smoothing or lookahead filtering suits pre-planned
+paths, while for online targets only causal smoothing or online trajectory generation is
+available~\citep{kroger2010line,macfarlane2003jerk}, which adds delay. The claims made in this part
+therefore concern the behaviour that remains after these standard mitigations are applied.
+Velocity-level controllers, resolved-rate motion control~\citep{whitney1969resolved}, damped least
+squares~\citep{wampler1986manipulator,chiaverini1994review}, and quadratic
 programming~\citep{zhang2013variable}, operate directly in the differential domain but require an
-explicit, accurate Jacobian at every timestep. The study presented in this part removes that
-requirement entirely: a Proximal Policy Optimization (PPO)~\citep{schulman2017proximal} controller
-maps a 19-dimensional observation directly to a 6-dimensional joint velocity command, trained on
-1.5 million static reachable poses with no trajectory supervision, no dynamic model, and no
-explicit Jacobian computation at inference time.
+explicit, accurate Jacobian at every timestep; on a non-spherical wrist, position and orientation
+errors are additionally coupled through all six Jacobian rows, so balancing translational against
+rotational accuracy needs geometry-specific weighting or damping that need not transfer between
+geometries. The study presented in this part removes the explicit-Jacobian requirement entirely: a
+Proximal Policy Optimization (PPO)~\citep{schulman2017proximal} controller maps a 19-dimensional
+observation directly to a 6-dimensional joint velocity command, trained on 1.5 million static
+reachable poses with no trajectory supervision, no dynamic model, and no explicit Jacobian
+computation at inference time. Learning-based approaches fall into two families by what they
+output: one optimizes the motion path itself, producing an offline trajectory that a separate
+controller executes~\citep{ota2019trajectory,li2021general,khan2025reinforcement}; the other, to which
+this study belongs, is reactive differential IK, in which the reference is supplied externally and the
+controller maps instantaneous pose error and robot state to joint-velocity commands at every step. The
+two are complementary, since a learned path generator could supply the reference that a reactive
+controller tracks. The proposed method is therefore a reactive differential IK controller rather
+than a trajectory generator: it resolves joint velocities online for externally supplied reference
+paths. The architecture is geometry-agnostic, but the study focuses on non-spherical wrists because
+their kinematic coupling prevents the analytical decoupling that spherical wrists admit, and so
+requires the reward to enforce simultaneous position--orientation convergence explicitly.
 
 %% ============================================================
 \section{Observation and Action Space}\label{sec:dikppo_observation}
@@ -70,10 +92,10 @@ per actuated joint of the Kinova Gen3 Lite, summarized in Table~\ref{tab:dikppo_
                               & Joint velocities & $\dot{\mathbf{q}}_t$ & 6 \\
                               & Position error   & $\Delta \mathbf{p}_t$ & 3 \\
                               & Orientation error & $\Delta \mathbf{Q}_t$ & 4 \\
+\cmidrule(l){2-4}
+                              & \textbf{Total observation} & & \textbf{19} \\
 \midrule
 Action & Joint velocity command & $\dot{\mathbf{q}}_p$ & 6 \\
-\midrule
-\textbf{Total observation} & & & \textbf{19} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -84,7 +106,7 @@ Figure~\ref{fig:dikppo_overall}.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\linewidth]{Images/dikppo/overall_method.jpg}
+\includegraphics[width=\linewidth]{Images/dikppo/overall_method.pdf}
 \caption{Overall method for differential inverse kinematics for trajectory tracking, from the
 NVIDIA Isaac Sim environment through the actor-critic network to the PPO policy
 update~\citep{sk2025diktracking}.}
@@ -97,24 +119,59 @@ update~\citep{sk2025diktracking}.}
 
 Training is conducted in NVIDIA Isaac Lab with a physics timestep of $\Delta t = 1/120$\,s and a
 control decimation of 2, giving a policy frequency of 60\,Hz. The Kinova Gen3 Lite is modelled as a
-USD asset with self-collisions enabled, joints are velocity-controlled so the policy output maps
-directly to a joint command, and each episode spans 600 steps with the arm initialized to its home
-configuration at every reset.
+USD asset with self-collisions enabled, and joints are velocity-controlled so the policy output maps
+directly to a joint command. The joint drive stiffness and damping of the articulation were
+calibrated against the physical robot: constant joint-velocity commands were applied in simulation
+and on the Kinova Gen3 Lite, the resulting end-effector trajectories were recorded and compared, and
+the drive parameters were tuned until the two matched. This aligns the nominal actuator response of
+the simulation with that of the hardware. Each episode spans 600 steps with the arm initialized to
+its home configuration at every reset. Episodes terminate only on time-out; no early termination on
+success, joint-limit contact, or collision is applied, so the policy is exposed to the full episode,
+including holding the pose after convergence. The reward contains no explicit joint-limit term:
+joint position limits are enforced by the PhysX articulation solver, and joint-limit awareness
+enters training through the reachable-pose dataset, which is restricted to configurations within the
+soft joint limits (Section~\ref{subsec:dikppo_dataset}).
 
-The target poses used for episode initialization are not sampled online but constructed once,
-offline, as a fixed dataset: each of the six joints is swept independently across its mechanical
-limit range at $5^\circ$ increments, the full combinatorial set of joint-angle tuples is mapped to
-its corresponding end-effector pose via forward kinematics, and Isaac Sim's contact-sensing
-pipeline discards any configuration that produces self-collision. This procedure yields 1.5 million
-collision-free, kinematically valid reachable poses, generated once and reused unchanged across the
-full training run. At every episode reset, a target pose is drawn uniformly at random from this
-fixed set, and the corresponding pose error, $\Delta \mathbf{p}_t$ and $\Delta \mathbf{Q}_t$ in
-Table~\ref{tab:dikppo_obsspace}, is computed relative to the robot's current end-effector pose.
-Stochasticity is introduced not by perturbing the target set itself but at the policy output, via
-the additive Gaussian action noise developed in Section~\ref{sec:dikppo_ppo}, which is what serves
-as the domain-randomization mechanism for sim-to-real transfer. Training runs on a single NVIDIA
-GeForce RTX 5060 Ti (16\,GB VRAM); the resulting hyperparameters are collected in
-Table~\ref{tab:dikppo_hyper}.
+At every episode reset, a target pose is drawn uniformly at random from the reachable-pose dataset
+described in Section~\ref{subsec:dikppo_dataset}, and the corresponding pose error, $\Delta
+\mathbf{p}_t$ and $\Delta \mathbf{Q}_t$ in Table~\ref{tab:dikppo_obsspace}, is computed relative to
+the robot's current end-effector pose. Stochasticity is introduced not by perturbing the target set
+itself but at the policy output, via the additive Gaussian action noise of
+Section~\ref{sec:dikppo_ppo}, which improves robustness to perturbations of the commanded joint
+velocities (Section~\ref{sec:dikppo_sim2real}). Training runs on a single NVIDIA GeForce RTX 5060 Ti
+(16\,GB VRAM); the resulting hyperparameters are collected in Table~\ref{tab:dikppo_hyper}.
+
+%% ------------------------------------------------------------
+\subsection{Reachable-Pose Dataset Generation}\label{subsec:dikppo_dataset}
+%% ------------------------------------------------------------
+
+The target poses are drawn from a reachable-pose dataset generated once, offline, in NVIDIA Isaac
+Lab by exhaustive grid enumeration of the joint space (Figure~\ref{fig:dikppo_dataset}). Each of the
+six arm joints is discretized into $N_s = 12$ uniformly spaced values over its soft position limits
+$[\theta_i^{\min}, \theta_i^{\max}]$, a resolution of $\Delta\theta_i = (\theta_i^{\max} -
+\theta_i^{\min})/(N_s - 1) \approx 0.49$\,rad ($\approx 28^\circ$). Their Cartesian product yields
+$N_s^6 \approx 3$\,M candidate configurations, all joint-limit feasible by construction.
+
+The candidates are evaluated in batches of 4096 parallel environments. In each environment the robot
+is reset to its home configuration and driven to the candidate configuration by joint position
+targets for 500 physics steps ($\Delta t = 1/60$\,s), which is ample time to reach any candidate,
+with the gripper held open. A contact sensor on every robot link monitors the net contact force
+throughout, and a candidate is discarded if any link registers non-zero contact force at any step,
+that is, a self-collision or contact with the ground plane. For each retained configuration, the
+joint vector and the settled end-effector pose (position and quaternion) in the robot base frame are
+stored. This yields approximately 1.5\,M collision-free reachable poses ($\approx 50\%$ of the
+candidates), reused unchanged throughout the $5\times10^{8}$-step training run. Because targets are
+sampled on a joint-space grid, their Cartesian density is not uniform across the workspace. All
+evaluation trajectories are off-grid, so the tracking results of
+Section~\ref{sec:dikppo_results} reflect generalization between sampled targets rather than recall
+of them.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\linewidth]{Images/dikppo/dataset_preparation.pdf}
+\caption{Offline generation of the collision-free reachable-pose dataset in Isaac Lab.}
+\label{fig:dikppo_dataset}
+\end{figure}
 
 \begin{table}[htbp]
 \centering
@@ -150,17 +207,18 @@ At each training iteration, experience tuples $\langle \mathbf{s}_t, \mathbf{a}_
 \mathbf{s}_{t+1}, d_t \rangle$ are collected across all 4096 parallel environments over
 $N_{\text{steps}} = 16$ steps, yielding 65{,}536 transitions per rollout. Additive Gaussian action
 noise is injected at the environment interface before command execution, both to improve robustness
-to real actuator imprecision and to serve as implicit domain randomization narrowing the
-sim-to-real gap:
+to real actuator imprecision and to perturbations of the commanded joint velocities:
 \begin{equation}
 \mathbf{a}_t = \operatorname{clip}\left( \pi_\theta(\cdot \mid \mathbf{s}_t) + \mathbf{g},\, -1,\, 1 \right),
 \qquad \mathbf{g} \sim \mathcal{N}(0,\, 0.05^2 \mathbf{I}_6).
 \label{eq:dikppo_actionnoise}
 \end{equation}
-Advantage estimates use Generalized Advantage Estimation with the critic value $V_\theta(\mathbf{s}_t)$:
+This noise is not a substitute for full domain randomization: latency, backlash, payload variation,
+and actuator dynamics were not randomized in this work. Advantage estimates use Generalized Advantage
+Estimation with the critic value $V_\theta(\mathbf{s}_t)$:
 \begin{equation}
 \hat{A}_t = \sum_{l=0}^{N_{\text{steps}}} (\gamma \lambda)^l\, \delta_{t+l}, \qquad
-\delta_t = r_t + \gamma V_\theta(\mathbf{s}_{t+1}) - V_\theta(\mathbf{s}_t),
+\delta_t = r_{t+1} + \gamma V_\theta(\mathbf{s}_{t+1}) - V_\theta(\mathbf{s}_t),
 \label{eq:dikppo_gae}
 \end{equation}
 and the actor is updated by maximizing the standard clipped PPO objective,
@@ -185,10 +243,28 @@ Designing a reward for trajectory tracking on a non-spherical wrist requires a c
 between position and orientation error convergence: an unconstrained algebraic combination of the
 two is susceptible to reward exploitation, where the agent maximizes one objective while leaving
 the other under-optimized. The reward function proposed here couples the two through a
-min-operator, adds a progress term that explicitly penalizes stagnation, and adds an energy penalty
-that suppresses velocity discontinuities, three components combined without manual inter-objective
-weighting or staged training curricula. This coupled construction, rather than the choice of PPO as
-the underlying optimizer, is the central contribution of this study.
+min-operator, adds a progress term that explicitly penalizes stagnation, and adds a joint velocity
+penalty that suppresses velocity discontinuities, three components combined without manual
+inter-objective weighting or staged training curricula. This coupled construction, rather than the
+choice of PPO as the underlying optimizer, is the central contribution of this study.
+
+The structure of this reward is dictated by the kinematics of the wrist. In spherical-wrist
+manipulators, disjoint joint groups decouple position and orientation, making additive rewards
+adequate. Offset wrists couple the two objectives instead: every wrist joint simultaneously alters
+both position and orientation~\citep{li2021novel}. This coupling imposes three requirements on the
+reward. First, additive rewards are exploitable, since a policy can maximize return by converging
+the better-conditioned error channel while neglecting the other; the min operator
+(Equation~\eqref{eq:dikppo_minop}) removes this incentive by basing the reward on the larger
+normalized error, forcing simultaneous convergence. Second, fixed reward weights fail to generalize
+because error sensitivity varies across the workspace; normalizing and min-coupling the errors
+removes manual weighting entirely. Third, kinematic coupling introduces multiple solution branches,
+and shifting between branches causes large joint displacements without reducing pose error; this is
+penalized by combining the asymmetric progress term (Equation~\eqref{eq:dikppo_progress}) with the
+joint velocity penalty (Equation~\eqref{eq:dikppo_energy}). The ablation study of
+Section~\ref{subsec:dikppo_rewardablation} supports this account, although it does not isolate each
+requirement: the conventionally weighted variant fails on both channels, and the min-coupled
+variants converge on both channels once the joint velocity penalty is included
+(Table~\ref{tab:dikppo_ablationtab}).
 
 %% ------------------------------------------------------------
 \subsection{Pose Reward}\label{subsec:dikppo_pose}
@@ -201,10 +277,18 @@ e_p = \frac{\lVert \mathbf{p}_{\text{target}} - \mathbf{p}_{ee} \rVert_2}{d_{\ma
 e_o = \frac{2 \cos^{-1}\!\left( \left| \operatorname{Re}(\mathbf{Q}_{ee} \otimes \mathbf{Q}_{\text{target}}^*) \right| \right)}{\pi},
 \label{eq:dikppo_normerror}
 \end{equation}
-where $d_{\max}$ is the diagonal of the workspace. Each normalized error is shaped through a
-combined inverse-quadratic and logarithmic term,
+where $d_{\max}$ is the diagonal of the workspace. All quaternions use the scalar-first convention
+$[w, x, y, z]$ and are expressed in the robot base frame. The relative orientation $\Delta\mathbf{Q}_t
+= \mathbf{Q}_{ee} \otimes \mathbf{Q}_{\text{target}}^*$ (Hamilton product) is provided directly to
+the policy as the orientation-error observation (Table~\ref{tab:dikppo_obsspace}). Since
+$\mathbf{Q}$ and $-\mathbf{Q}$ represent the same rotation, $e_o$ is computed from the absolute
+value of the scalar part of $\Delta\mathbf{Q}_t$, which makes it invariant to the quaternion sign and
+bounds the rotation angle to $[0, \pi]$, so that $e_o \in [0, 1]$. All reported orientation metrics
+use the same sign-invariant angle, $2\cos^{-1}(|\operatorname{Re}(\Delta\mathbf{Q}_t)|)$, in radians,
+before normalization by $\pi$. Each normalized error is shaped through a combined inverse-quadratic
+and logarithmic term,
 \begin{equation}
-r(x) = \frac{2.5}{1 + 100 x^2} - 0.1 \log\!\left( x + 1 \times 10^{-8} \right),
+r(x) = \frac{2.5}{1 + 100 x^2} - 0.1 \log\!\left( x + 10^{-8} \right),
 \label{eq:dikppo_shaping}
 \end{equation}
 which provides strong attraction near the goal through its inverse-quadratic component while the
@@ -257,20 +341,23 @@ for regression imposes a sharply increasing cost as error grows, creating steady
 monotonic convergence.
 
 %% ------------------------------------------------------------
-\subsection{Energy Penalty and Total Reward}\label{subsec:dikppo_energy}
+\subsection{Joint Velocity Penalty and Total Reward}\label{subsec:dikppo_energy}
 %% ------------------------------------------------------------
 
 Trajectory tracking further requires smooth, continuous joint motion throughout, not merely
-accurate terminal poses. A continuous energy penalty on joint velocity commands is applied at every
-timestep,
+accurate terminal poses. A continuous joint velocity penalty on the squared joint velocity commands
+is applied at every timestep,
 \begin{equation}
-r_{\text{energy}} = 1 - \exp\!\left( 0.2 \sum_{i=1}^{6} \dot{q}_i^2 \right),
+r_{\text{vel}} = 1 - \exp\!\left( 0.2 \sum_{i=1}^{6} \dot{q}_i^2 \right),
 \label{eq:dikppo_energy}
 \end{equation}
-whose exponential form imposes a sharply increasing cost as aggregate joint velocity grows. The
-total reward at each timestep is the sum of the three components,
+whose exponential form imposes a sharply increasing cost as aggregate joint velocity grows. This
+term acts as a control-effort regularization on the commanded joint velocities; unlike energy-based
+formulations that model physical energy exchange, such as transactive energy in physical
+human--robot interaction~\citep{khan2024transformer}, it does not represent mechanical energy or power
+consumption. The total reward at each timestep is the sum of the three components,
 \begin{equation}
-r_{t+1} = r_{\text{pose}} + r_{\text{prog}} + r_{\text{energy}},
+r_{t+1} = r_{\text{pose}} + r_{\text{prog}} + r_{\text{vel}},
 \label{eq:dikppo_totalreward}
 \end{equation}
 combining accurate pose convergence, per-step progress pressure on whichever error is worst, and
@@ -284,7 +371,7 @@ tuning against the others.
 At deployment, the policy output is clipped and converted from normalized radians to the degrees
 per second the Kinova Kortex API~\citep{Kinovarobotics_2025} requires:
 \begin{equation}
-\dot{\mathbf{q}}_p = \operatorname{clip}(\mathbf{a}_t,\, -1,\, 1) \cdot \frac{180}{\pi} \;\; (^\circ/\text{s}),
+\dot{\mathbf{q}}_p = \operatorname{clip}(\mathbf{a}_t,\, -1,\, 1) \cdot \frac{180}{\pi} \;\; [^\circ/\text{s}],
 \label{eq:dikppo_hwvel}
 \end{equation}
 with observation parity maintained directly from Kortex actuator feedback, preserving the exact
@@ -304,14 +391,37 @@ frequency of 20\,Hz since feedback reading and command dispatch execute sequenti
 roughly one third of the 60\,Hz frequency used during training; because the policy is a memoryless
 mapping from instantaneous observation to velocity command, with no recurrent state, a lower
 deployment frequency only extends the zero-order-hold duration of each command rather than
-invalidating any individual policy input. Consistent with the action noise of
-Equation~\eqref{eq:dikppo_actionnoise} and the energy penalty of Equation~\eqref{eq:dikppo_energy}
-jointly bounding output velocity magnitude, no frequency-related degradation was observed at the
-tested trajectory speed: hardware position RMSE on the circular trajectory (6.3\,mm) was in fact
-lower than the simulation RMSE (9.95\,mm), consistent with actuator damping and low-level velocity
-smoothing further attenuating the discretized commands at the tested speed, though this should be
-read as evidence against degradation at that specific speed rather than general frequency
-invariance.
+invalidating any individual policy input. The action noise of Equation~\eqref{eq:dikppo_actionnoise}
+and the joint velocity penalty of Equation~\eqref{eq:dikppo_energy} jointly bound output velocity
+magnitude, limiting the inter-sample integration error introduced by a longer hold. Consistent with
+this, no frequency-related degradation was observed at the tested trajectory speed: hardware position
+RMSE on the circular trajectory (6.3\,mm) was in fact lower than the simulation RMSE (9.95\,mm),
+possibly aided by actuator damping and low-level velocity smoothing of the discretized commands,
+although this was not tested in isolation. This should be read as evidence against degradation at
+that specific speed rather than general frequency invariance.
+
+The policy receives neither the desired Cartesian velocity of the reference nor any observation
+history. It is a purely reactive state-feedback law acting on the instantaneous pose error, so
+continuous tracking proceeds as a sequence of quasi-static pose-reaching problems: at each control
+step the reference is resampled and the policy drives the current error toward zero. Like classical
+resolved-rate control without a feedforward term~\citep{whitney1969resolved}, such error-driven
+feedback induces a bounded tracking lag proportional to $v/K$, where $v$ is the Cartesian reference
+speed and $K$ the effective closed-loop gain. At the evaluated speed ($r\omega = 15$\,mm/s) the
+reference advances only $\approx 0.25$\,mm per step at 60\,Hz and $\approx 0.75$\,mm per step at
+20\,Hz, so each step remains close to the static reaching problem seen in training, and the
+asymmetric progress reward penalizes step-wise error growth, which favors a high effective gain. As
+speed increases the lag grows with $v$ until the joint velocity commands saturate, beyond which
+bounded tracking fails. This scaling is evaluated over 0.05--0.3\,rad/s in
+Section~\ref{sec:dikppo_results} (Table~\ref{tab:dikppo_speed}); characterizing the speed limit
+itself, and adding velocity feedforward or a short waypoint preview to the observation for
+anticipatory tracking, are left to future work.
+
+Joint velocity commands are bounded by hardware velocity limits at the actuator level and further
+soft-constrained by the joint velocity penalty. The hard clipping of policy outputs to $[-1,1]$
+before dispatch bounds the magnitude of every command at both the simulation and hardware
+interfaces. Clipping limits only command magnitude, however, and does not by itself guarantee safety
+near kinematic singularities, at joint limits, or under unexpected contact. In simulation, joint
+position limits are enforced by Isaac Lab's physics solver rather than by the policy.
 
 %% ============================================================
 \section{Baseline Comparison and Reward Ablation}\label{sec:dikppo_ablation}
@@ -329,8 +439,13 @@ reward.
 %% ------------------------------------------------------------
 
 The proposed coupled reward, Equation~\eqref{eq:dikppo_totalreward}, is paired with TRPO and with
-SAC under an otherwise identical setup, alongside sparse-reward variants (terminal success only) of
-PPO and SAC, to isolate whether the reward or the algorithm drives the result.
+SAC under an otherwise identical setup, alongside sparse-reward variants of PPO and SAC, to isolate
+whether the reward or the algorithm drives the result. The sparse variants (suffix -S) replace the
+pose and progress terms with a tolerance signal of $-1$ per channel while the position or
+orientation error exceeds 4\,cm or 0.1\,rad respectively, and $0$ otherwise, plus a bonus of $+10$
+when both are within tolerance; the joint velocity penalty is retained. PPO-D was trained with three
+seeds (42, 100, and 200), which converge to the same plateau (Figure~\ref{fig:dikppo_seedcurves});
+Figure~\ref{fig:dikppo_traincurves} shows seed 42.
 
 \begin{figure}[htbp]
 \centering
@@ -341,40 +456,71 @@ sparse rewards (SAC-D, SAC-S)~\citep{sk2025diktracking}.}
 \label{fig:dikppo_traincurves}
 \end{figure}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.7\linewidth]{Images/dikppo/seed_variation.pdf}
+\caption{PPO-D training curves for three seeds, min--max normalized over all three runs (the scale
+is not comparable to Figure~\ref{fig:dikppo_traincurves}).}
+\label{fig:dikppo_seedcurves}
+\end{figure}
+
+PPO outperformed SAC in this task, which highlights a trade-off between gradient stability and sample
+efficiency. One plausible explanation is PPO's clipped surrogate objective, which restricts the
+magnitude of policy updates and may implicitly suppress high-frequency velocity fluctuations under
+the dense reward, although this mechanism was not isolated by a dedicated ablation.
 Figure~\ref{fig:dikppo_traincurves} shows PPO-D converging monotonically to a mean terminal reward
-of $\approx 0.93$, the highest and smoothest of any configuration. TRPO-D, despite sharing the
-identical coupled reward and PPO's conservative trust-region philosophy, converges more slowly and
-plateaus at $\approx 0.71$: its exact KL-divergence constraint, versus PPO's clipped surrogate
-approximation, requires a more expensive constrained update per step, and under an identical
-timestep budget this leaves TRPO less converged. SAC exhibits the opposite failure mode: SAC's
-maximum-entropy objective, which explicitly rewards maintaining stochasticity in the action
-distribution, directly conflicts with the exponential energy penalty of
-Equation~\eqref{eq:dikppo_energy}, which penalizes any non-zero joint velocity near convergence. The
-two objectives settle into a stable compromise in which the policy sustains a small, persistent
-non-zero error rather than fully converging, visible as SAC-D and SAC-S plateauing at $\approx 0.40$
-and $\approx 0.81$ respectively; notably SAC-D, trained for nearly double SAC-S's step budget in
-the hope that additional experience would let the dense reward eventually dominate, remains well
-below SAC-S, indicating the entropy-energy conflict is not resolved by additional training. PPO-S
-stagnates almost immediately at $\approx 0.12$, confirming that without the dense, coupled reward
-shaping of Section~\ref{sec:dikppo_reward}, sparse terminal feedback alone is too infrequent for
-the policy to learn the precise joint coordination continuous trajectory tracking requires. Training
-wall-clock cost varies substantially with these dynamics, from PPO-D's 1\,h 5\,m to TRPO-D's 3\,h
-14\,m for the same step count, so the proposed method's accuracy and smoothness gains come at a
-one-time, sub-two-hour training cost rather than any added cost per deployment.
+of $\approx 0.93$, the highest and smoothest of any configuration, consistent with it tolerating the
+conflicting gradients introduced by the joint velocity penalty and the progress reward. TRPO-D,
+despite sharing the identical coupled reward and PPO's conservative trust-region philosophy,
+converges more slowly and plateaus at $\approx 0.71$: its exact KL-divergence constraint, versus
+PPO's clipped surrogate approximation, requires a more expensive constrained update per step, and
+under an identical timestep budget this leaves TRPO less converged. SAC-D substantially
+underperforms its sparse counterpart SAC-S, plateauing at $\approx 0.40$ against $\approx 0.81$;
+notably SAC-D, trained for nearly double SAC-S's step budget, remains well below it. This is
+consistent with, though not definitive proof of, a conflict between the maximum-entropy objective,
+which encourages exploratory joint motion, and the joint velocity penalty, which favors near-idle
+behaviour to minimize control effort at the expense of task progress. PPO-S stagnates almost
+immediately at $\approx 0.12$, confirming that without the dense, coupled reward shaping of
+Section~\ref{sec:dikppo_reward}, sparse terminal feedback alone is too infrequent for the policy to
+learn the precise joint coordination continuous trajectory tracking requires. Together these results
+suggest that neither reward structure nor algorithm alone determines performance: dense rewards are
+necessary for precise credit assignment, and among the optimizers tested, PPO was the most robust to
+the conflicting gradients they introduce. Training wall-clock cost varies substantially with these
+dynamics (Table~\ref{tab:dikppo_wallclock}), from PPO-D's 1\,h 5\,m to TRPO-D's 3\,h 14\,m, so the
+proposed method's accuracy and smoothness gains come at a one-time, sub-two-hour training cost
+rather than any added cost per deployment.
+
+\begin{table}[htbp]
+\centering
+\caption{Wall-clock training time and total timesteps per algorithm.}
+\label{tab:dikppo_wallclock}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Method} & \textbf{Total timesteps} & \textbf{Wall-clock time} \\
+\midrule
+PPO-D (proposed) & $\approx 5\times10^{8}$   & 1\,h 05\,m 35\,s \\
+PPO-S            & $\approx 3.5\times10^{8}$ & 38\,m 52\,s \\
+TRPO-D           & $\approx 5\times10^{8}$   & 3\,h 14\,m 36\,s \\
+SAC-D            & $\approx 9\times10^{8}$   & 2\,h 52\,m 34\,s \\
+SAC-S            & $\approx 4\times10^{8}$   & 1\,h 24\,m 01\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 %% ------------------------------------------------------------
 \subsection{Reward Component Ablation}\label{subsec:dikppo_rewardablation}
 %% ------------------------------------------------------------
 
 Holding PPO fixed, four reward variants isolate the contribution of each component on circular
-trajectory tracking: (a) a conventional (unshaped, uncoupled) reward, (b) the min-operator pose
-reward plus progress shaping without the energy penalty, (c) the min-operator pose reward plus the
-energy penalty without progress shaping, and (d) the full reward of
+trajectory tracking, with summary metrics additionally reported on the 3-D Lissajous: (a) a
+conventional (unshaped, uncoupled) reward, (b) Min + Progress, the min-operator pose reward plus
+progress shaping without the joint velocity penalty, (c) Min + Velocity Penalty, the min-operator
+pose reward plus the penalty without progress shaping, and (d) the full reward of
 Equation~\eqref{eq:dikppo_totalreward}.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{Images/dikppo/ablation_joint_velocity.png}
+\includegraphics[width=0.85\linewidth]{Images/dikppo/ablation_joint_velocity.jpg}
 \caption{Joint velocity command magnitude across the four reward ablation variants during circular
 trajectory tracking~\citep{sk2025diktracking}.}
 \label{fig:dikppo_ablationvel}
@@ -392,56 +538,169 @@ variants~\citep{sk2025diktracking}.}
 \centering
 \includegraphics[width=\linewidth]{Images/dikppo/ablation_xy_trajectory.jpeg}
 \caption{XY trajectory comparison across the four reward ablation variants on circular tracking:
-(a) conventional, (b) min reward plus progress, (c) min reward plus energy penalty, (d) full
-reward~\citep{sk2025diktracking}.}
+(a) conventional, (b) Min + Progress, (c) Min + Velocity Penalty, (d) Full
+(proposed)~\citep{sk2025diktracking}.}
 \label{fig:dikppo_ablationtraj}
 \end{figure}
 
-Figure~\ref{fig:dikppo_ablationvel} shows the energy penalty's direct effect: peak action magnitude
-falls from 2.0\,rad/s under the conventional reward to below 0.25\,rad/s under the full reward,
-with variant (b), progress shaping without the energy penalty, still producing large transient
-velocity spikes that collapse into erratic oscillation, confirming the energy term rather than the
+Figure~\ref{fig:dikppo_ablationvel} shows the joint velocity penalty's direct effect: peak action
+magnitude falls from 2.0\,rad/s under the conventional reward to below 0.25\,rad/s under the full
+reward, with variant (b), progress shaping without the penalty, still producing large transient
+velocity spikes that collapse into erratic oscillation, confirming the penalty rather than the
 min-operator is what suppresses these spikes. Figure~\ref{fig:dikppo_ablationerr} shows the
-conventional reward (a) maintaining persistent 15 to 20\,mm oscillation that never settles below
-threshold, variant (c), the energy penalty without progress shaping, achieving stable sub-threshold
-tracking but at a higher steady-state median of 10\,mm, and the full reward (d) achieving the
-lowest median position error of 6\,mm with the tightest distribution, consistently tracking below
-10\,mm throughout. Figure~\ref{fig:dikppo_ablationtraj} shows the same pattern geometrically: the
-conventional reward fails to complete the circular path at all, deviating substantially near the
-start; variant (b) completes the circle but with visible radial deviation; variants (c) and (d)
-closely follow the desired trajectory, with the full reward (d) achieving near-perfect circular
-tracking. Together these confirm that all three reward components, the min-operator pose coupling,
-the asymmetric progress shaping, and the energy penalty, are each necessary, and that no pair alone
-reproduces the full reward's combination of accuracy and smoothness.
+conventional reward (a) maintaining persistent oscillation with a median error of 15 to 20\,mm that
+never settles below threshold, variant (c), the penalty without progress shaping, achieving stable
+sub-threshold tracking but at a higher steady-state median of $\approx 10$\,mm, and the full reward
+(d) achieving the lowest median position error of $\approx 6$\,mm with the tightest distribution,
+consistently tracking below 10\,mm throughout. Figure~\ref{fig:dikppo_ablationtraj} shows the same
+pattern geometrically: the conventional reward fails to complete the circular path at all, deviating
+substantially near the start; variant (b) completes the circle but with visible radial deviation;
+variants (c) and (d) closely follow the desired trajectory, with the full reward (d) achieving
+near-perfect circular tracking. Together these indicate that all three reward components, the
+min-operator pose coupling, the asymmetric progress shaping, and the joint velocity penalty, are
+each necessary, and that no pair alone reproduces the full reward's combination of accuracy and
+smoothness.
+
+Table~\ref{tab:dikppo_ablationtab} summarizes all variants by RMSE on the circle and the 3-D
+Lissajous; for (a) and (b), the RMSE reflects the large deviations visible in
+Figure~\ref{fig:dikppo_ablationtraj}, whereas the medians above describe their typical error. The
+ranking is preserved on the Lissajous: without the joint velocity penalty, (a) and (b) fail on both
+curves; adding it reduces position RMSE to 12--18\,mm; and the progress term further improves
+position on both curves and orientation on the Lissajous (0.053 to 0.044\,rad), where the
+orientation demand is higher. Variant (d) is PPO-D, trained with three seeds
+(Table~\ref{tab:dikppo_seeds}); variants (a)--(c) are single-seed.
+
+\begin{table}[htbp]
+\centering
+\caption{Reward ablation on the circle and the 3-D Lissajous (position and orientation RMSE,
+smoothness index).}
+\label{tab:dikppo_ablationtab}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{3}{c}{\textbf{Circle}} & \multicolumn{3}{c}{\textbf{3-D Lissajous}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Variant} & \textbf{Pos.} & \textbf{Orn.} & \textbf{Smooth.} & \textbf{Pos.} & \textbf{Orn.} & \textbf{Smooth.} \\
+ & \textbf{(m)} & \textbf{(rad)} & \textbf{(rad/s$^{2}$)} & \textbf{(m)} & \textbf{(rad)} & \textbf{(rad/s$^{2}$)} \\
+\midrule
+(a) Conventional             & 0.1969  & 0.0800 & 50.31  & 0.2226  & 0.0858 & 32.71 \\
+(b) Min + Progress           & 0.1421  & 0.1045 & 28.81  & 0.1178  & 0.0818 & 32.89 \\
+(c) Min + Velocity Penalty   & 0.01223 & 0.0225 & 0.0055 & 0.01822 & 0.0533 & 0.0142 \\
+(d) Full (proposed)          & 0.00995 & 0.0265 & 0.0055 & 0.01667 & 0.0437 & 0.0147 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 %% ============================================================
 \section{Results: Simulation and Hardware Trajectory Tracking}\label{sec:dikppo_results}
 %% ============================================================
 
-Final validation compares the trained policy (PPO-D) against five baselines, TRAC-IK, DLS, velocity
+Final validation compares the trained policy (PPO-D) against five baselines, TRAC-IK, DLS, Velocity
 QP, TRPO-D, and SAC-S, spanning classical numerical, classical velocity-level, and alternative
 learned methods, across three trajectory geometries chosen to span fixed orientation (circle),
 periodically varying orientation (lemniscate), and high-curvature multi-axis motion (3-D
-Lissajous).
+Lissajous). All methods operate under closed-loop Cartesian feedback: the velocity-level baselines
+(DLS, Velocity QP) recompute the Jacobian and pose error at every control timestep rather than
+integrating open-loop, and TRAC-IK is re-seeded with its own previous solution at every waypoint, so
+it is evaluated with the standard seeding mitigation in place. No trajectory smoothing, lookahead
+filtering, or online filtering is applied to any method, so all are compared on their unfiltered
+commands; lookahead methods would in any case require upcoming waypoints that the online setting
+considered here does not provide. Per-method action scales
+(Table~\ref{tab:dikppo_simresults}) were tuned on the circular trajectory to equalize each method's
+native output magnitude to the robot's velocity limits, then frozen and applied identically across
+all other trajectories. No method, including the proposed policy, is given the desired Cartesian
+velocity of the reference; all compute their commands from the current reference pose and the
+measured robot state, so the comparison is made under identical reference information. SAC-S, which
+trained better than SAC-D (Figure~\ref{fig:dikppo_traincurves}), is used in all tracking
+evaluations. The metrics reported for the proposed method are for training seed 42, with all three
+seeds in Table~\ref{tab:dikppo_seeds}; classical baselines are deterministic and evaluated once,
+and TRPO-D and SAC-S are single-seed policies. Baseline implementation parameters are given in
+Table~\ref{tab:dikppo_baselines}, with TRAC-IK executed in Gazebo via ROS~1 on identical reference
+trajectories.
+
+\begin{table}[htbp]
+\centering
+\caption{Simulation results of the proposed method for three training seeds (mean $\pm$ sample
+std).}
+\label{tab:dikppo_seeds}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+\textbf{Metric} & \textbf{Curve} & \textbf{Seed 42} & \textbf{Seed 100} & \textbf{Seed 200} & \textbf{Mean $\pm$ std} \\
+\midrule
+\multirow{3}{*}{Pos. RMSE (m)} & Circle     & 0.00995 & 0.00859 & 0.01403 & $0.01086\pm0.00283$ \\
+                               & Lemniscate & 0.01065 & 0.01893 & 0.01601 & $0.01520\pm0.00420$ \\
+                               & Lissajous  & 0.01667 & 0.01723 & 0.01106 & $0.01498\pm0.00341$ \\
+\midrule
+\multirow{3}{*}{Orn. RMSE (rad)} & Circle     & 0.0265 & 0.0275 & 0.0296 & $0.0279\pm0.0016$ \\
+                                 & Lemniscate & 0.0235 & 0.0235 & 0.0349 & $0.0273\pm0.0066$ \\
+                                 & Lissajous  & 0.0437 & 0.0460 & 0.0500 & $0.0466\pm0.0032$ \\
+\midrule
+\multirow{3}{*}{Smoothness (rad/s$^2$)} & Circle     & 0.0055 & 0.0037 & 0.0061 & $0.0051\pm0.0012$ \\
+                                        & Lemniscate & 0.0107 & 0.0057 & 0.0123 & $0.0096\pm0.0034$ \\
+                                        & Lissajous  & 0.0147 & 0.0120 & 0.0184 & $0.0151\pm0.0032$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Implementation of the classical baselines. DLS and Velocity QP share the pose error
+$\mathbf{e}=[\Delta\mathbf{p};\,\phi\hat{\mathbf{u}}]$ and a Jacobian $\mathbf{J}$ obtained by finite
+differencing of the forward kinematics ($\delta=10^{-4}$\,rad), recomputed at every step. All
+commands are multiplied by the frozen $a_\text{scale}$ of Table~\ref{tab:dikppo_simresults}. For
+TRAC-IK, $\boldsymbol{\theta}$ denotes the measured joint positions, used only to convert the
+solution into a velocity command.}
+\label{tab:dikppo_baselines}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.14\linewidth}>{\raggedright\arraybackslash}p{0.46\linewidth}>{\raggedright\arraybackslash}p{0.32\linewidth}@{}}
+\toprule
+\textbf{Method} & \textbf{Control law} & \textbf{Parameters} \\
+\midrule
+DLS &
+$\dot{\boldsymbol{\theta}}=\mathbf{J}^{\top}(\mathbf{J}\mathbf{J}^{\top}+\lambda^{2}\mathbf{I})^{-1}\mathbf{e}$ &
+$\lambda=0.05$; unity gain \\
+Velocity QP &
+$\min_{\dot{\boldsymbol{\theta}}}\ \tfrac{1}{2}\dot{\boldsymbol{\theta}}^{\top}(\mathbf{I}+\lambda\mathbf{J}^{\top}\mathbf{J})\dot{\boldsymbol{\theta}}-(\mathbf{J}^{\top}\mathbf{e})^{\top}\dot{\boldsymbol{\theta}}$ \newline
+s.t.\ $|\dot{\theta}_i|\le 1$\,rad/s &
+$\lambda=10^{-3}$; OSQP (tol.\ $10^{-4}$, $\le$1000 iter.); zero command if unsolved \\
+TRAC-IK &
+Distance solve, then $\dot{\boldsymbol{\theta}}=(\boldsymbol{\theta}_\text{IK}-\boldsymbol{\theta})/\Delta t$, $\Delta t=0.034$\,s &
+$\epsilon=10^{-5}$; 5\,ms timeout; seeded with previous solution; held on failure \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/dikppo/circle_comparison.jpg}
-\caption{Circle trajectory comparison: (a) TRAC-IK, (b) DLS pseudo-inverse Jacobian, (c) velocity
-QP, (d) TRPO-D, (e) SAC-S, (f) PPO-D~\citep{sk2025diktracking}.}
+\caption{Circle trajectory comparison: (a) TRAC-IK, (b) DLS, (c) Velocity QP, (d) TRPO-D, (e) SAC-S,
+(f) PPO-D~\citep{sk2025diktracking}.}
 \label{fig:dikppo_circlecomp}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{Images/dikppo/lissajous_comparison.jpg}
+\caption{3-D Lissajous trajectory comparison: (a) TRAC-IK, (b) DLS, (c) Velocity QP, (d) TRPO-D,
+(e) SAC-S, (f) PPO-D.}
+\label{fig:dikppo_lissajouscomp}
 \end{figure}
 
 \begin{table}[htbp]
 \centering
 \caption{Simulation performance across circle, lemniscate, and 3-D Lissajous trajectories, with
-frozen per-method action scales. No classical baseline is uniformly best; PPO is the only method
+frozen per-method action scales. No classical baseline is uniformly best; PPO-D is the only method
 with stable accuracy and smoothness across all three geometries. Best value per metric in
 bold~\citep{sk2025diktracking}.}
 \label{tab:dikppo_simresults}
+\footnotesize
 \begin{tabular}{llccc}
 \toprule
-\textbf{Method} & \textbf{Curve} & \textbf{Pos. RMSE (m)} & \textbf{Orn. RMSE (rad)} & \textbf{Smoothness} \\
+\textbf{Method} & \textbf{Curve} & \textbf{Pos. RMSE (m)} & \textbf{Orn. RMSE (rad)} & \textbf{Smoothness (rad/s$^2$)} \\
 \midrule
 \multirow{3}{*}{TRAC-IK} & Circle & 0.001242 & 0.003409 & 54.55 \\
                           & Lemniscate & \textbf{0.001073} & 0.004332 & 52.00 \\
@@ -451,51 +710,125 @@ bold~\citep{sk2025diktracking}.}
                           & Lemniscate & 0.013554 & 0.036097 & 0.0159 \\
                           & Lissajous & 0.027939 & 0.020683 & 0.0222 \\
 \midrule
-\multirow{3}{*}{Vel. QP} & Circle & 0.011013 & 0.002900 & 0.0124 \\
+\multirow{3}{*}{Velocity QP} & Circle & 0.011013 & 0.002900 & 0.0124 \\
                           & Lemniscate & 0.013254 & 0.003857 & 0.0294 \\
                           & Lissajous & 0.035303 & 0.008647 & 0.0164 \\
 \midrule
-\multirow{3}{*}{TRPO}    & Circle & 0.089448 & 0.372891 & 2.92 \\
+\multirow{3}{*}{TRPO-D}  & Circle & 0.089448 & 0.372891 & 2.92 \\
                           & Lemniscate & 0.130428 & 0.383532 & 0.141 \\
                           & Lissajous & 0.122329 & 0.257595 & 0.815 \\
 \midrule
-\multirow{3}{*}{SAC}     & Circle & 0.029320 & 0.051513 & 19.78 \\
+\multirow{3}{*}{SAC-S}   & Circle & 0.029320 & 0.051513 & 19.78 \\
                           & Lemniscate & 0.030142 & 0.051104 & 19.08 \\
                           & Lissajous & 0.029181 & 0.050908 & 18.85 \\
 \midrule
-\multirow{3}{*}{\textbf{PPO}} & Circle & 0.009951 & 0.026476 & \textbf{0.0055} \\
+\multirow{3}{*}{\textbf{PPO-D}} & Circle & 0.009951 & 0.026476 & \textbf{0.0055} \\
                           & Lemniscate & 0.010650 & 0.023536 & 0.0107 \\
                           & Lissajous & 0.016667 & 0.043686 & 0.0147 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:dikppo_simresults} and Figure~\ref{fig:dikppo_circlecomp} show that no single
-classical baseline is uniformly competitive, and the pattern of failure for each follows directly
-from its underlying mechanism rather than a tuning artefact. TRAC-IK achieves the lowest position
-RMSE on the circle (1.2\,mm) and lemniscate (1.07\,mm), since resolving each waypoint as an
-independent constrained optimization allows near-exact convergence at every individual pose in a
-noiseless simulation, but with no explicit coupling between consecutive solves, small differences in
-optimizer convergence translate directly into joint-space discontinuities frame to frame, giving it
-a smoothness index three to four orders of magnitude worse than every other method, and on the
-Lissajous curve, where curvature and orientation both vary, its nearest-seed assumption breaks down
-and position RMSE degrades roughly 30-fold relative to the circle. DLS's fixed-gain
-error-coupling strongly favours orientation correction on the circle, where required angular
-correction is small, giving the best orientation RMSE of any method there, but the same fixed gain
-cannot adaptively reallocate correction authority on the lemniscate, where orientation must vary
-continuously, and its orientation RMSE there is worse than PPO's on the identical curve. TRPO shares
-PPO's coupled reward and on-policy structure but its exact KL-divergence constraint leaves it less
-converged under an identical training budget, producing both higher residual error and
-substantially worse smoothness than PPO on every curve. SAC's maximum-entropy objective again
-directly conflicts with the energy penalty, producing a persistent radial offset of
-$\approx 2.9$\,cm essentially unchanged across all three curves, consistent with an entropy-energy
-trade-off rather than a tracking failure specific to any one geometry. PPO does not achieve the
-single lowest RMSE on every curve, but it is the only method whose position RMSE stays confined to a
-narrow 9.9 to 16.7\,mm band across all three geometries while every classical baseline degrades
-sharply on at least one, and it is the smoothest method by one to four orders of magnitude on every
-curve, a direct, traceable consequence of the min-operator pose coupling, the asymmetric progress
-shaping, and the energy penalty developed in Section~\ref{sec:dikppo_reward}, none of which any
-baseline shares.
+Motion smoothness is quantified by the smoothness index $S$, the root-mean-square joint angular
+acceleration computed from the joint velocities $\dot{\theta}_{i,k}$ logged at every control step of
+a trial,
+\begin{equation}
+S = \sqrt{\frac{1}{6(N-1)}\sum_{k=1}^{N-1}\sum_{i=1}^{6}\left(\frac{\dot{\theta}_{i,k+1}-\dot{\theta}_{i,k}}{t_{k+1}-t_k}\right)^{2}}\quad [\text{rad/s}^{2}],
+\label{eq:dikppo_smoothness}
+\end{equation}
+where $N$ is the number of logged steps and $i$ indexes the six joints; lower $S$ indicates smoother
+joint motion.
+
+Table~\ref{tab:dikppo_simresults} and Figures~\ref{fig:dikppo_circlecomp} and
+\ref{fig:dikppo_lissajouscomp} show that no single classical baseline is uniformly competitive, and
+the pattern of failure for each follows from its underlying mechanism rather than a tuning artefact.
+TRAC-IK, seeded with its previous solution, achieves the lowest position RMSE on the circle
+(1.2\,mm) and lemniscate (1.07\,mm), since resolving each waypoint as an independent constrained
+optimization allows near-exact convergence at every individual pose in a noiseless simulation. But
+with no explicit velocity-domain coupling between consecutive solves, small differences in optimizer
+convergence translate directly into joint-space discontinuities frame to frame. This is consistent
+with its smoothness index of 52--62, the largest of any method: about three times that of SAC-S,
+19 to 370 times that of TRPO-D, and three to four orders of magnitude above DLS, Velocity QP, and
+PPO-D. On the Lissajous curve, where curvature and orientation both vary, the nearest-seed
+assumption breaks down, and position RMSE degrades roughly 30-fold relative to the circle (1.2\,mm
+to 35.3\,mm). DLS's fixed-gain error-coupling strongly favours orientation correction on the circle,
+where required angular correction is small, giving the best orientation RMSE of any method there,
+but the same fixed gain cannot adaptively reallocate correction authority on the lemniscate, where
+orientation must vary continuously, and its orientation RMSE there is worse than PPO-D's on the
+identical curve. Velocity QP uses the same Jacobian and pose error as DLS but solves a regularized
+quadratic program with explicit joint-velocity bounds at every step. It attains the best
+orientation RMSE of any method on the lemniscate and the Lissajous ($3.9\times10^{-3}$ and
+$8.6\times10^{-3}$\,rad) but does not lead in position on any curve (11.0--35.3\,mm), degrading on
+the Lissajous to a level comparable with TRAC-IK; this is consistent with the single fixed weighting
+of the combined pose error, shared with DLS, favouring the orientation channel. TRPO-D shares
+PPO-D's coupled reward and on-policy structure, but its exact KL-divergence constraint leaves it
+less converged under an identical training budget (Table~\ref{tab:dikppo_wallclock}), producing both
+higher residual error and substantially worse smoothness than PPO-D on every curve. SAC-S settles at
+steady-state errors of $\approx 2.9$\,cm and $\approx 0.051$\,rad across all three trajectories.
+These values lie within the 4\,cm / 0.1\,rad tolerance of its sparse reward, inside which the pose
+component of the reward is constant, so the policy has no incentive to reduce the error further;
+this is consistent with an offset independent of trajectory geometry. Its elevated smoothness index
+(18.9--19.8) may reflect the maximum-entropy objective, which the retained joint velocity penalty
+does not fully suppress within the tolerance zone; this was not isolated by a dedicated ablation.
+
+PPO-D does not achieve the single lowest RMSE on every curve, but it is the most consistent method
+across geometries: its position RMSE stays confined to a 9.9 to 16.7\,mm band (seed 42; 10.9 to
+15.2\,mm as three-seed means) across all three, while every classical baseline degrades sharply on
+at least one (TRAC-IK by $\sim 30\times$ on the Lissajous, DLS's orientation by $\sim 47\times$ on
+the lemniscate). It achieves the lowest mean smoothness index across all evaluated trajectories,
+improving on DLS and Velocity QP by a factor of 1.7 to 3 on the circle and lemniscate, performing
+comparably to Velocity QP on the Lissajous, and outperforming TRPO-D, TRAC-IK, and SAC-S by one to
+four orders of magnitude. This consistency is in line with the structure of the proposed reward,
+although reward and optimizer were not varied independently for every baseline. The min-operator
+coupling prevents the policy from trading orientation accuracy for position accuracy under the
+shifting demands of each curve, consistent with PPO-D not exhibiting the orientation collapse seen
+in DLS on the lemniscate. The asymmetric progress shaping penalizes stagnation at every timestep
+regardless of trajectory geometry, consistent with PPO-D avoiding the persistent in-tolerance offset
+of SAC-S, which corresponds to sustained, under-penalized error under a sparser reward. The
+exponential joint velocity penalty acts directly on joint velocity magnitude, which plausibly
+underlies PPO-D's smoothness advantage over every baseline. Neither the classical baselines nor
+SAC-S use this reward, which may explain why their performance is uneven across geometries; TRPO-D
+uses the same reward but converges to a lower training reward. The evidence supports the reward as
+necessary rather than sufficient: with the same optimizer, the sparse reward fails (PPO-S), and with
+the same reward and training budget, TRPO-D converges to a lower reward
+(Section~\ref{subsec:dikppo_algcompare}); the SAC comparison additionally differs in reward and
+training budget. The result therefore reflects the proposed reward combined with a stable on-policy
+optimizer.
+
+Table~\ref{tab:dikppo_speed} reports the proposed method at reference angular velocities of
+0.05--0.3\,rad/s (seed 42, simulation). Tracking remains bounded up to three times the nominal
+speed, and position RMSE grows approximately linearly with speed, roughly doubling from 0.1 to
+0.3\,rad/s on every curve, consistent with the tracking lag scaling as $v/K$
+(Section~\ref{sec:dikppo_sim2real}); the smoothness index rises more steeply, as faster references
+require larger joint corrections.
+
+\begin{table}[htbp]
+\centering
+\caption{Effect of reference angular velocity $\omega$ on the proposed method (seed 42,
+simulation).}
+\label{tab:dikppo_speed}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llcccc}
+\toprule
+\textbf{Metric} & \textbf{Curve} & \multicolumn{4}{c}{$\boldsymbol{\omega}$ \textbf{(rad/s)}} \\
+\cmidrule(lr){3-6}
+ & & \textbf{0.05} & \textbf{0.1} & \textbf{0.2} & \textbf{0.3} \\
+\midrule
+\multirow{3}{*}{Pos. RMSE (m)} & Circle     & 0.00829 & 0.00995 & 0.01431 & 0.01894 \\
+                               & Lemniscate & 0.00837 & 0.01065 & 0.01609 & 0.02152 \\
+                               & Lissajous  & 0.01261 & 0.01667 & 0.02603 & 0.03529 \\
+\midrule
+\multirow{3}{*}{Orn. RMSE (rad)} & Circle     & 0.0216 & 0.0265 & 0.0369 & 0.0471 \\
+                                 & Lemniscate & 0.0183 & 0.0235 & 0.0377 & 0.0522 \\
+                                 & Lissajous  & 0.0340 & 0.0437 & 0.0641 & 0.0833 \\
+\midrule
+\multirow{3}{*}{Smoothness (rad/s$^2$)} & Circle     & 0.0017 & 0.0055 & 0.0188 & 0.0387 \\
+                                        & Lemniscate & 0.0032 & 0.0107 & 0.0359 & 0.0720 \\
+                                        & Lissajous  & 0.0042 & 0.0147 & 0.0505 & 0.1008 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[htbp]
 \centering
@@ -523,91 +856,147 @@ varying end-effector orientation~\citep{sk2025diktracking}.}
 
 \begin{table}[htbp]
 \centering
-\caption{Hardware performance on the Kinova Gen3 Lite: circle for all four methods, plus PPO
-generalization to lemniscate, 3-D Lissajous, and square without retraining. PPO is the only method
-that does not degrade relative to its simulation result (Table~\ref{tab:dikppo_simresults}). Best
-value per metric in bold~\citep{sk2025diktracking}.}
+\caption{Hardware performance on the Kinova Gen3 Lite: circle for all four methods, plus PPO-D
+generalization to square, lemniscate, and 3-D Lissajous without retraining. Best value per metric in
+bold~\citep{sk2025diktracking}.}
 \label{tab:dikppo_hwresults}
+\footnotesize
 \begin{tabular}{llcc}
 \toprule
 \textbf{Method} & \textbf{Curve} & \textbf{Pos. RMSE (m)} & \textbf{Orn. RMSE (rad)} \\
 \midrule
 TRAC-IK & Circle & 0.0362 & 0.0770 \\
 DLS     & Circle & 0.0490 & \textbf{0.0021} \\
-SAC     & Circle & 0.0450 & 0.0590 \\
+SAC-S   & Circle & 0.0450 & 0.0590 \\
 \midrule
-\multirow{3}{*}{PPO} & Circle & \textbf{0.0063} & 0.0320 \\
-                      & Lemniscate & 0.0124 & 0.0212 \\
-                      & Lissajous & 0.0154 & 0.0410 \\
+\multirow{4}{*}{PPO-D} & Circle & \textbf{0.0063} & 0.0320 \\
+                        & Square & 0.0079 & 0.0334 \\
+                        & Lemniscate & 0.0124 & 0.0212 \\
+                        & Lissajous & 0.0154 & 0.0410 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-TRAC-IK, DLS, and SAC-S were each deployed on the circular trajectory (Figure~\ref{fig:dikppo_hwbaselines}),
-one representative per method family, while PPO was further evaluated on lemniscate, 3-D Lissajous,
-and square trajectories without any retraining (Figure~\ref{fig:dikppo_hwcirclesquare},
-Figure~\ref{fig:dikppo_hwlissajous}). The sim-to-hardware transition, Table~\ref{tab:dikppo_hwresults}
-against Table~\ref{tab:dikppo_simresults}, reveals which methods depend on assumptions that do not
-survive contact with real actuator dynamics. TRAC-IK's position RMSE degrades roughly 29-fold
-(1.2\,mm to 36.2\,mm), the largest gap of any method, a direct consequence of resolving each
-waypoint independently from encoder feedback with no mechanism to detect or correct real-world
-drift or actuator lag between solves. DLS degrades a comparatively moderate 3-fold (16\,mm to
-49\,mm), consistent with its damping factor being calibrated against an idealized simulated
-Jacobian that does not account for joint compliance and backlash on the physical hardware, though
-its orientation advantage on the circle persists on hardware since the constant-orientation
-condition producing it is preserved there too. SAC degrades $\approx 1.5$-fold (29\,mm to 45\,mm),
-consistent with its sim-to-real gap being dominated by the same entropy-energy offset already
-present in simulation rather than an additional hardware-specific failure mode. PPO is the only
-method that does not degrade from simulation to hardware at all: position RMSE on the circle is
-6.3\,mm on hardware against 9.95\,mm in simulation, consistent with the additive Gaussian action
-noise of Equation~\eqref{eq:dikppo_actionnoise} training the policy to remain accurate under
-actuator-level noise of comparable magnitude to what it encounters on hardware, so the transition
-exposes no unmodelled failure mode of the kind that affects the purely kinematic and feedback-only
-classical baselines. Across all four hardware trajectories, PPO maintains position RMSE between
-6.3\,mm and 15.4\,mm without retraining; the lemniscate and 3-D Lissajous curves, which present
-orientation variation and curvature not explicitly represented in the static-pose training
-distribution, show only a modest increase in error, a direct consequence of training on a dense,
-joint-limit-aware sample of the reachable pose-error space rather than on trajectory-specific
-demonstrations. Since the policy's input is instantaneous pose error rather than a trajectory index,
-sufficiently dense coverage of that error space at training time transfers to trajectory geometries
-never seen during training, exactly the generalization result gap G6 required.
+Hardware trajectories use the same shapes, sizes, and speed as in simulation ($r = 0.15$\,m, side
+0.2\,m for the square, $\omega = 0.1$\,rad/s) centred at $[0.3, -0.1, 0.2]$\,m and execute at 20\,Hz.
+TRAC-IK, DLS, and SAC-S were each deployed on the circular trajectory
+(Figure~\ref{fig:dikppo_hwbaselines}), one representative per method family, while PPO-D was further
+evaluated on square, lemniscate, and 3-D Lissajous trajectories without any retraining
+(Figures~\ref{fig:dikppo_hwcirclesquare} and~\ref{fig:dikppo_hwlissajous}). Velocity QP is omitted
+from the hardware comparison because it shares the Jacobian, pose error, and fixed-weight structure
+of DLS, which therefore represents the classical velocity-level family. The sim-to-hardware
+transition, Table~\ref{tab:dikppo_hwresults} against Table~\ref{tab:dikppo_simresults}, reveals which
+methods depend on assumptions that do not survive contact with real actuator dynamics. TRAC-IK's
+position RMSE degrades roughly 29-fold (1.2\,mm to 36.2\,mm), the largest gap of any method,
+consistent with its lack of a feedback term linking consecutive solves: each waypoint is resolved
+independently from encoder feedback with no mechanism to detect or correct real-world drift or
+actuator lag between solves. DLS degrades a comparatively moderate 3-fold (16\,mm to 49\,mm),
+consistent with its damping factor being calibrated against an idealized simulated Jacobian that
+does not account for joint compliance and backlash on the physical hardware, though its orientation
+advantage on the circle persists on hardware since the constant-orientation condition producing it
+is preserved there too. SAC-S degrades $\approx 1.5$-fold (29\,mm to 45\,mm); its in-tolerance offset
+from simulation persists, and the additional error is attributed to unmodelled hardware effects.
+
+On the circle, the only trajectory run by every method on hardware, PPO-D is the only method whose
+position error did not increase from simulation to hardware: 6.3\,mm on hardware against 9.95\,mm
+in simulation. We attribute this to several factors acting together rather than to any single
+mechanism: (i) the policy is a closed-loop reactive controller that re-reads the measured robot
+state at every step, so errors from residual model mismatch are corrected continuously rather than
+accumulated; (ii) the action and observation interfaces are identical in simulation and on hardware
+(joint-velocity commands to velocity-controlled actuators, with the same 19-D observation), and the
+simulated joint drives were calibrated against the physical robot (Section~\ref{sec:dikppo_env});
+(iii) the additive Gaussian action noise of Equation~\eqref{eq:dikppo_actionnoise} makes the policy
+robust to perturbations of the commanded velocities; and (iv) the evaluated regime of low-speed,
+unloaded, non-contact tracking keeps the effects of latency, backlash, and payload small. The policy
+also tolerated a threefold reduction in control frequency from training (60\,Hz) to hardware (20\,Hz)
+without retraining, which is partial evidence of robustness to timing mismatch. Because latency,
+backlash, payload variation, and actuator dynamics were not randomized, this result is established
+for the tested operating regime and should not be extrapolated beyond it without further robustness
+evaluation. Across all four hardware trajectories, PPO-D maintains position RMSE between 6.3\,mm and
+15.4\,mm without retraining; the lemniscate and 3-D Lissajous curves, which present orientation
+variation and curvature not explicitly represented in the static-pose training distribution, show
+only a modest increase in error. This generalization is consistent with training on a dense,
+joint-limit-aware sample of the reachable pose-error space (Section~\ref{subsec:dikppo_dataset})
+rather than on trajectory-specific demonstrations: since the policy's input is instantaneous pose
+error rather than a trajectory index, sufficiently dense coverage of that error space at training
+time transfers to trajectory geometries never seen during training, the generalization result gap G6
+required, within the four geometries evaluated here.
+
+Taken together, the simulation and hardware results are consistent with the proposed reward
+structure, in combination with a stable on-policy optimizer, underlying the method's
+accuracy-smoothness balance in simulation and its resistance to sim-to-real position-error
+degradation on hardware within the tested operating regime. Each baseline's hardware result degrades
+by an amount consistent with a documented limitation of its control structure: absence of
+inter-waypoint feedback for TRAC-IK, fixed-gain miscalibration for DLS, and a persistent
+tolerance-band offset for SAC-S.
+
+\paragraph{Limitations of Part I.}
+TRPO-D, SAC-S, and ablation variants (a)--(c) were trained with a single seed, and all physical
+experiments are single-trial executions, so hardware run-to-run variance is uncharacterized. The
+speed evaluation is restricted to simulation with one training seed, and the effects of control
+frequency and of training action noise were not ablated. The evaluation covers four trajectory
+geometries at a single spatial scale, within a localized workspace region, from a fixed initial
+configuration, at 0.05--0.3\,rad/s in simulation and 0.1\,rad/s on hardware; generalization to other
+scales, wider workspace regions, or randomized initial states remains untested. Hardware baseline
+comparison was restricted to the circle. Behaviour near kinematic singularities is uncharacterized,
+the policy has no formal stability or safety guarantee (velocity clipping bounds only command
+magnitude; energy-based approaches such as passivity-based control, which monitor the energy
+exchanged with the environment, can offer such guarantees~\citep{khan2025quantum}), and latency,
+backlash, payload variation, and actuator dynamics were not randomized, so the sim-to-real result
+holds for low-speed, unloaded, non-contact tracking only. Future work includes multi-seed training
+for the TRPO-D and SAC-S baselines and the ablation variants, a reference-velocity or waypoint
+preview in the observation, characterization of the speed limit, domain randomization over latency,
+backlash, payload, and actuator parameters, and an external safety layer such as a control-barrier
+or passivity-based filter~\citep{khan2025quantum}.
 
 %% ================================================================
 %% PART II
 %% ================================================================
 \section*{Part II: Prior-Guided Policy Learning for Cooperative Dual-Arm Pre-Assembly Alignment}
-\addcontentsline{toc}{section}{Part II: ALPHA, Adaptive Hierarchical Blending for Cooperative Dual-Arm Alignment}
+\addcontentsline{toc}{section}{Part II: GPC, Gated Prior Composition for Cooperative Dual-Arm Alignment}
 
 %% ============================================================
 \section{From a Single-Arm Prior to Dual-Arm Coordination}\label{sec:alpha_formulation}
 %% ============================================================
 
-Existing dual-arm multi-agent reinforcement learning approaches typically require agents to acquire
+Robot manipulation underpins industrial tasks such as pick-and-place, sorting, and assembly, and
+conventional modular control pipelines depend on accurate kinematic or dynamic models that are
+difficult to obtain in practice~\citep{trajec_conv}. Reinforcement learning has emerged as an
+alternative that learns control policies from interaction rather than from collected
+demonstrations~\citep{liu2026review}, and single-arm RL has shown promise in path
+planning~\citep{hemalatha2026cleannav} and pick-and-place~\citep{dahmani2025reinforcement}. Complex
+tasks such as component alignment and assembly, however, require collaborative rather than isolated
+single-arm execution. Existing dual-arm multi-agent reinforcement learning approaches typically require agents to acquire
 low-level actuator skills and high-level inter-agent coordination simultaneously, from scratch, and
 sample efficiency degrades exponentially when they do. Current approaches often rely on rigid,
 hand-designed action priors that do not adapt across task phases, and the literature lacks a
 principled mechanism for transitioning between a stable single-arm prior and a learned multi-agent
 coordination policy, leaving the entire computational burden on the coordination
 policy~\citep{sk2025alpha}. The study presented in this part removes that burden directly: the
-frozen PPO controller of Part I, already shown to generalize across arbitrary end-effector
-trajectories, is reused unchanged as a stable low-level reaching prior for each arm, while a
+frozen PPO controller of Part I, already shown to generalize across the four continuous trajectory
+geometries evaluated there, is reused unchanged as a stable low-level reaching prior for each arm, while a
 Multi-Agent PPO (MAPPO) coordination policy, trained under Centralized Training with Decentralized
 Execution (CTDE), learns only the inter-arm coordination the frozen prior structurally cannot
 express. The two are combined through a learned, per-agent gating scalar $\alpha_t^i$ that
 continuously interpolates between them and is trained jointly with the coordination policy from
 timestep zero, rather than following a fixed or staged blending schedule.
 
-Dual-arm cooperative manipulation is formulated as a fully cooperative decentralized partially
-observable Markov decision process (Dec-POMDP) under the CTDE paradigm. Because both arms are
-structurally symmetric, sharing identical architecture and observation dimensionality, MAPPO's
-simultaneous policy update with a shared global-state critic is well suited to the setting,
-directly capturing inter-arm spatial relationships during training while preserving decentralized
-execution at deployment~\citep{yu2022surprising}. This differs from fully decentralized methods
-such as IPPO~\citep{dewitt2020independent}, whose critics are blind to the partner agent's state,
-and from heterogeneous-agent methods such as HATRPO and HAPPO~\citep{kuba2021trust}, whose
-monotonic-improvement guarantee comes from a sequential per-agent update that, in a task demanding
-simultaneous bilateral convergence, computes one agent's advantage against an already-shifted joint
-policy for the other.
+Dual-arm coordination is framed as a hierarchical control problem: a frozen single-arm reaching
+prior is composed with a learned coordination policy responsible for inter-arm alignment, and the
+cooperative problem is a decentralized partially observable Markov decision process (Dec-POMDP).
+CTDE-style multi-agent training supplies the mechanism for learning the coordination policy: MAPPO's
+shared global-state critic captures inter-arm spatial relationships that a purely per-arm training
+signal cannot, while per-arm policies remain independently executable at deployment~\citep{yu2022surprising}.
+This decentralized-execution property is retained as an architectural feature, useful for future
+distributed or independently controlled arms, rather than a requirement of the present system: both
+arms are driven from a single CPU-only platform in the hardware experiments reported here
+(Section~\ref{sec:alpha_sim2real}). This differs from fully decentralized methods such as
+IPPO~\citep{dewitt2020independent}, whose critics are blind to the partner agent's state, and from
+heterogeneous-agent methods such as HAPPO~\citep{kuba2021trust}, whose monotonic-improvement guarantee
+comes from a sequential per-agent update that, in a task demanding simultaneous bilateral
+convergence, computes one agent's advantage against an already-shifted joint policy for the other.
+Because both arms are structurally symmetric, sharing identical architecture and observation
+dimensionality, MAPPO's simultaneous update is the better-suited choice of the two.
 
 The task itself has two phases, illustrated in Figure~\ref{fig:alpha_architecture}: an approach
 phase, in which each arm reaches independently toward a randomly sampled target pose, and an
@@ -626,18 +1015,27 @@ alignment target provided to either agent.
 
 
 
-Novel to this study, relative to the hierarchical, residual, and CTDE dual-arm methods it builds on,
-are five contributions: an incremental adaptive gating mechanism in which the blending coefficient
-and coordination policy co-evolve jointly from timestep zero rather than following a fixed ratio or
-staged curriculum; a Dec-POMDP formulation with a 47-dimensional per-agent local observation and a
-92-dimensional shared global critic state; a two-regime piecewise reward with a coupled min-operator
-binding each agent's reward to its worst pose-error component, directly reusing the coupling
-technique of Section~\ref{subsec:dikppo_pose}; a snap mechanism that resolves a moving-target
-instability in simulation training by fixing a geometric sub-goal once the arms are close enough to
-align; and a demonstrated sim-to-real transfer in which the simulation-only snap mechanism is
-deliberately replaced by a policy-agnostic waypoint state machine at deployment, showing that the
-learned coordination behaviour is encoded in the policy weights rather than in the reward structure
-that produced them.
+Relative to the hierarchical, residual, and CTDE dual-arm methods it builds on, this study makes five
+contributions. First, an integrated two-stage pipeline for cooperative dual-arm pre-assembly
+alignment, comprising a single-arm reaching policy trained under PPO and then frozen, a learned
+coordination policy operating on 47-dimensional local observations with a 92-dimensional global
+critic state, a phase-conditioned reward, and a deployment-time waypoint controller, validated
+end-to-end on physical hardware rather than in simulation alone. Second, direct sim-to-real transfer
+under a deliberate architectural mismatch: the training-time snap mechanism is replaced at deployment
+by a policy-agnostic waypoint state machine, achieving 93.3\% reach and 90.0\% alignment across 30
+hardware trials at 200\,Hz policy inference on a CPU-only platform, which establishes that the learned
+coordination is encoded in the policy weights rather than in the reward structure. Third, a
+reward-success decoupling in hierarchical multi-agent control: at a fixed blending ratio of 0.9 the
+cumulative training reward ranks among the highest of all variants while alignment success is
+effectively zero, so cumulative reward is an unreliable model-selection signal when the base policy
+dominates the action space. Fourth, the adaptive gating component, in which each agent emits a
+bounded increment that accumulates into a per-arm scalar $\alpha_t^i \in [0, 0.8]$, rate-limiting the
+blend trajectory and co-adapting with the coordination policy from timestep zero, with ablations
+isolating its contribution against fixed-ratio and warm-up variants. Fifth, a two-regime piecewise
+reward with a coupled min-operator that binds each agent's reward to its worst pose-error component,
+directly reusing the coupling technique of Section~\ref{subsec:dikppo_pose}, together with a
+training-time snap mechanism that resolves the moving-target instability arising when both arms
+simultaneously pursue each other's current pose.
 
 The environment is built in NVIDIA Isaac Lab with 4096 parallel environments; simulation training
 runs on an NVIDIA RTX 5060 Ti, and hardware deployment runs entirely on the CPU-only Intel NUC9 used
@@ -735,8 +1133,11 @@ enforcing decentralized execution, while the critic loss $\mathcal{L}^V$ conditi
 state $S_t$ and is parameterized by independent per-agent critic weights $\phi^i$, enabling
 centralized credit assignment during training. This asymmetry, local input for the actor, global
 input for the critic, is the mathematical expression of CTDE, and is what distinguishes the MAPPO
-objective from single-agent PPO, where both terms share the same state argument. Hyperparameters are
-listed in Table~\ref{tab:alpha_hyper}.
+objective from single-agent PPO, where both terms share the same state argument. Both networks are
+updated jointly over multiple epochs per rollout using a KL-adaptive learning-rate scheduler that
+reduces the step size when the mean KL divergence between $\pi_\theta$ and $\pi_{\theta_{\text{old}}}$
+exceeds a fixed threshold, preventing destructively large coordination-policy updates.
+Hyperparameters are listed in Table~\ref{tab:alpha_hyper}.
 
 \begin{table}[htbp]
 \centering
@@ -766,11 +1167,60 @@ Activation function                          & Tanh \\
 \end{tabular}
 \end{table}
 
+The configuration in Table~\ref{tab:alpha_hyper}, which closely follows skrl's standard settings for
+MAPPO-family algorithms, was applied uniformly to all baselines (MAPPO, HAPPO, IPPO) rather than being
+independently tuned per method, so that no method receives an asymmetric tuning advantage. All
+baselines therefore share identical learning rate, KL-adaptive scheduler and threshold, learning
+epochs, mini-batch count, clip ratios, entropy and value-loss coefficients, gradient-norm clipping,
+rollout length, discount and GAE parameters, network architecture, and training budget. The methods
+differ only in their actor update scheme and critic observability.
+
 %% ============================================================
 \section{Adaptive Policy Blending}\label{sec:alpha_blending}
 %% ============================================================
 
-At every timestep, the frozen single-arm policy from Part I is queried independently for each arm
+The base policy is the single-arm reaching policy of Part I, trained under PPO~\citep{schulman2017proximal}
+on a 25-dimensional observation space and frozen before coordination training begins. It is trained on
+the joint-limit-aware dataset of 1.5\,M reachable workspace poses under a reward coupling position and
+orientation error together with a joint velocity penalty, and learns a joint-velocity-level
+differential inverse kinematics mapping. Training this stage separately serves two purposes. It
+supplies a competent low-level actuator prior, so that the coordination policy is not required to
+acquire reachability from scratch; and it addresses reachability implicitly, since the prior was
+trained on a reachability-validated set of joint configurations, so the coordination policy operates
+in an a priori feasible region of the workspace without online geometric solvers. Its training
+configuration is listed in Table~\ref{tab:alpha_basehyper}.
+
+\begin{table}[htbp]
+\centering
+\caption{Base-policy training hyperparameters.}
+\label{tab:alpha_basehyper}
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Observation dimension       & 25 \\
+Action dimension            & 6 (joint velocities) \\
+Timesteps                   & $5 \times 10^{8}$ \\
+Environments                & 4096 \\
+Steps per rollout ($N_{\text{steps}}$) & 16 \\
+Learning epochs per rollout & 10 \\
+Mini-batch size             & 4096 \\
+Episode length              & 600 steps \\
+Discount factor ($\gamma$)  & 0.99 \\
+GAE parameter ($\lambda$)   & 0.95 \\
+Learning rate               & $5 \times 10^{-5}$ \\
+Clip ratio ($\epsilon$)     & 0.13 \\
+Value loss coefficient ($c_1$) & 0.5 \\
+Entropy coefficient ($c_2$) & 0.01 \\
+Gradient norm clip          & 0.5 \\
+Network architecture        & $[256 \times 256]$ \\
+Activation function         & $\tanh$ \\
+Weight initialization       & Orthogonal \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At every timestep, the frozen single-arm policy is queried independently for each arm
 using its own 25-dimensional observation $\mathbf{o}_t^i$ (Table~\ref{tab:dikppo_obsspace} without
 the phase and blending-context terms specific to this study):
 \begin{equation}
@@ -813,6 +1263,82 @@ observation and the global critic state, the full pipeline closes a temporal inf
 actor and critic condition their next decision on the recent history of blending behaviour, forming
 a closed-loop adaptive control structure over the blending coefficient itself, illustrated
 empirically in Figure~\ref{fig:alpha_evolution} in Section~\ref{sec:alpha_results}.
+
+
+\subsection{Properties of the Blending Mechanism}\label{sec:alpha_properties}
+
+The blending update in Equations~\eqref{eq:alpha_increment}--\eqref{eq:alpha_combined} is not part of
+the policy; it is part of the environment transition. The seventh action component consumed by the
+PPO ratio is the raw, pre-transformation actor output. The $\tanh$, scaling, and accumulate-and-clip
+operations that produce $\alpha_t^i$ all occur downstream of the sampled action, so the
+policy-gradient estimator is unbiased as in standard MAPPO. Since $\alpha_t^i$ is included in both the
+local observation and the global critic state, the augmented state evolves deterministically from the
+previous state and action and remains Markov. The blended system is therefore a well-posed Dec-POMDP
+and MAPPO's convergence properties transfer unchanged; no separate convergence theory for $\alpha$ is
+required. The following properties instead characterize what the mechanism guarantees by
+construction.
+
+\begin{proposition}[Invariance]\label{prop:invariance}
+$\alpha_t^i \in [0, 0.8]$ for all $t$, and the outer clip in Equation~\eqref{eq:alpha_combined} is never
+active on the blend term.
+\end{proposition}
+\begin{proof}
+$\alpha_0^i = 0 \in [0,0.8]$, and $\mathrm{clip}(\cdot, 0, 0.8)$ maps into $[0,0.8]$, so by induction
+$\alpha_t^i \in [0,0.8]$ for all $t$. Since $\mathbf{b}_t^i, \mathbf{m}_t^i \in [-1,1]^6$ and
+$\alpha_t^i \in [0,1]$, their convex combination already lies in $[-1,1]^6$.
+\end{proof}
+
+\begin{proposition}[Rate Limit]\label{prop:ratelimit}
+$|\alpha_{t+1}^i - \alpha_t^i| < 0.05$.
+\end{proposition}
+\begin{proof}
+Write $\mathrm{clip}(\cdot,0,0.8)$ as the Euclidean projection $\Pi$ onto a convex set. $\Pi$ is
+non-expansive and $\Pi(\alpha_t^i) = \alpha_t^i$ since $\alpha_t^i \in [0,0.8]$ by
+Proposition~\ref{prop:invariance}, so $|\alpha_{t+1}^i - \alpha_t^i| = |\Pi(\alpha_t^i + \Delta\alpha_t^i) -
+\Pi(\alpha_t^i)| \le |\Delta\alpha_t^i| < 0.05$.
+\end{proof}
+
+\begin{proposition}[Bounded Gating-Induced Action Variation]\label{prop:actionvariation}
+The blended command decomposes as
+\begin{multline}
+\mathbf{u}_{t+1}^i - \mathbf{u}_t^i = \underbrace{\alpha_t^i(\mathbf{b}_{t+1}^i - \mathbf{b}_t^i) + (1-\alpha_t^i)(\mathbf{m}_{t+1}^i - \mathbf{m}_t^i)}_{\text{inherited term}} \\
++ \underbrace{(\alpha_{t+1}^i - \alpha_t^i)(\mathbf{b}_{t+1}^i - \mathbf{m}_{t+1}^i)}_{\text{gating-induced term}},
+\label{eq:alpha_decomposition}
+\end{multline}
+and the gating-induced term is bounded by 0.1 in $\ell_\infty$ norm, independent of the actor outputs.
+\end{proposition}
+\begin{proof}
+$\|\mathbf{b}_{t+1}^i - \mathbf{m}_{t+1}^i\|_\infty \le 2$ since both terms lie in $[-1,1]^6$, and by
+Proposition~\ref{prop:ratelimit} the gating factor is bounded by 0.05, giving $0.05 \times 2 = 0.1$.
+\end{proof}
+
+A gate emitted directly, for example through a sigmoid, without the increment structure of
+Equation~\eqref{eq:alpha_increment}, admits no such bound: a single step could swing $\alpha_t^i$ across its
+full range, producing a gating-induced term of up to $0.8 \times 2 = 1.6$, sixteen times larger.
+Proposition~\ref{prop:actionvariation} converts this into a quantitative bounded-commanded-velocity
+guarantee at the 20\,Hz hardware control loop.
+
+\begin{proposition}[Rate Limit Is Non-Restrictive]\label{prop:nonrestrictive}
+Traversing the full range of $\alpha_t^i$ requires at least $0.8/0.05 = 16$ control steps,
+$\approx$1.2\% of a 1380-step episode at 60\,Hz.
+\end{proposition}
+This is corroborated empirically by Figure~\ref{fig:alpha_evolution}, which shows rapid saturation
+during the approach phase and a sharp transition at the phase boundary, so the per-step increment
+bound does not measurably constrain how quickly the policy can shift its reliance on the prior.
+
+\begin{proposition}[Bounded Deviation from the Prior]\label{prop:boundeddeviation}
+For fixed $\alpha_t^i$, the reachable command set is $\mathcal{U}(\alpha_t^i) = \alpha_t^i \mathbf{b}_t^i +
+(1-\alpha_t^i)[-1,1]^6$, a box of half-width $(1-\alpha_t^i)$ centred at $\alpha_t^i \mathbf{b}_t^i$;
+equivalently $\|\mathbf{u}_t^i - \alpha_t^i \mathbf{b}_t^i\|_\infty \le 1 - \alpha_t^i$. At the cap
+$\alpha_t^i=0.8$, the executed command is confined within 0.2 of the scaled prior.
+\end{proposition}
+
+No optimality claim is made for $\alpha_t^i$. Proposition~\ref{prop:boundeddeviation} shows the
+reachable command set is a strict subset of $[-1,1]^6$ whenever $\alpha_t^i > 0$, so the blended policy
+class is genuinely restricted relative to an unconstrained MAPPO actor. This is a deliberate trade of
+representational completeness for sample efficiency and bounded action variation: the 0.8 cap
+guarantees the learned component retains at least 20\% weight, so directional control is never fully
+ceded to the prior.
 
 %% ============================================================
 \section{Reward Design}\label{sec:alpha_reward}
@@ -885,9 +1411,13 @@ orientation thresholds (Figure~\ref{fig:alpha_sim2real}).
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.75\linewidth]{Images/alpha/Fig_2.jpg}
-\caption{Simulation-to-real hardware deployment architecture on the dual Kinova Gen3 Lite
-system.}
+\includegraphics[width=\linewidth]{Images/alpha/Fig_2.jpg}
+\caption{Sim-to-real deployment pipeline on dual Kinova Gen3 Lite manipulators via the Kortex API. A
+state machine sequences approach, grasp, and coarse/fine alignment phases; at each control step the
+current observation is normalized and passed to the hierarchical residual blending module, which
+queries the frozen PPO base policy and the MAPPO residual policy and combines their outputs into a
+joint velocity command, attenuated by a forward-kinematics consistency filter before dispatch via the
+Kortex API.}
 \label{fig:alpha_sim2real}
 \end{figure}
 
@@ -930,8 +1460,11 @@ completed the reach phase.
 \begin{table}[htbp]
 \centering
 \caption{Evaluation results over 10 trials across 4096 parallel environments (mean $\pm$ std),
-comparing ALPHA against pure MARL algorithms and fixed blending
-ratios~\citep{sk2025alpha}.}
+comparing GPC against pure MARL algorithms and fixed blending
+ratios~\citep{sk2025alpha}. All methods were trained under a single seed (42) and evaluated over 10
+independent trials, so the reported deviations characterize evaluation variance at fixed
+initialization; seed-level variance for the proposed method is reported in
+Table~\ref{tab:seed_robustness}.}
 \label{tab:alpha_baseline}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lccc}
@@ -939,12 +1472,11 @@ ratios~\citep{sk2025alpha}.}
 \textbf{Method} & \textbf{Reach succ. (\%)} & \textbf{Align succ. (\%)} & \textbf{Rel. succ. (\%)} \\
 \midrule
 MAPPO~\citep{yu2022surprising}                 & 71.6 $\pm$ 0.5 & 8.3 $\pm$ 0.3 & 11.6 $\pm$ 0.5 \\
-HAPPO~\citep{kuba2021trust}                    & \textbf{73.6 $\pm$ 0.7} & \textbf{32.3 $\pm$ 0.8} & 43.9 $\pm$ 1.2 \\
+HAPPO~\citep{kuba2021trust}                    & 73.6 $\pm$ 0.7 & 32.3 $\pm$ 0.8 & 43.9 $\pm$ 1.2 \\
 IPPO~\citep{dewitt2020independent}             & 62.0 $\pm$ 0.5 & 25.0 $\pm$ 0.3 & 40.3 $\pm$ 0.6 \\
-HATRPO~\citep{kuba2021trust}                   & 6.6 $\pm$ 0.3  & 3.4 $\pm$ 0.1  & 51.5 $\pm$ 2.8 \\
-PPO-MAPPO (0.5-0.5, fixed)                     & 41.1 $\pm$ 0.8 & 18.4 $\pm$ 0.5 & 44.8 $\pm$ 1.1 \\
-PPO-MAPPO (0.8-0.2, fixed)                     & 47.7 $\pm$ 0.8 & 17.6 $\pm$ 0.8 & 36.9 $\pm$ 1.3 \\
-PPO-MAPPO (0.9-0.1, fixed)                     & 1.76 $\pm$ 0.2 & 0.02 $\pm$ 0.01 & 1.1 $\pm$ 0.6 \\
+Fixed $\alpha = 0.5$                           & 41.1 $\pm$ 0.8 & 18.4 $\pm$ 0.5 & 44.8 $\pm$ 1.1 \\
+Fixed $\alpha = 0.8$                           & 47.7 $\pm$ 0.8 & 17.6 $\pm$ 0.8 & 36.9 $\pm$ 1.3 \\
+Fixed $\alpha = 0.9$                           & 1.76 $\pm$ 0.2 & 0.02 $\pm$ 0.01 & 1.1 $\pm$ 0.6 \\
 \bottomrule
 \end{tabular}%
 }
@@ -957,11 +1489,11 @@ high-level alignment simultaneously under a single joint reward degrades sample 
 IPPO, despite being blind to the partner agent's state, achieves higher absolute alignment (25.0\%)
 than MAPPO, indicating that decentralized critics encourage more conservative per-arm behaviour that
 reduces interference during fine alignment, at the direct cost of coordination quality. HAPPO
-reaches the highest reach success among MARL baselines (73.6\%) but its sequential per-agent update,
-the mechanism providing its monotonic-improvement guarantee, computes one agent's advantage against
-an already-shifted joint policy for the other, directly disrupting the simultaneous convergence
-bilateral alignment demands. HATRPO collapses almost entirely (6.6\% reach), its exact
-KL-constrained update proving incompatible with 12-DOF continuous joint velocity exploration.
+reaches the highest reach success among MARL baselines (73.6\%), yet its alignment success (32.3\%)
+and conditional success (43.9\%) remain well below GPC. It retains a centralized critic with global
+state access, but its sequential per-agent update, the mechanism providing its monotonic-improvement
+guarantee, computes one agent's advantage against a shifted joint policy for the other, directly
+disrupting the simultaneous convergence bilateral alignment demands.
 Fixed-ratio blending reveals a further, counterintuitive decoupling: despite the highest cumulative
 training reward of any configuration, fixed $\alpha = 0.8$ and $\alpha = 0.5$ yield reach success of
 only 47.7\% and 41.1\%, since a rigidly dominant prior actively suppresses the coordination policy's
@@ -976,8 +1508,8 @@ unreliable proxy for cooperative task success whenever the base policy dominates
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/Fig_4.png}
-\caption{Ablation study: total mean reward evolution of ALPHA (adaptive PPO plus MAPPO from
-timestep zero) against a warm-up curriculum (150k-step scale freeze) and adaptive blending with alternative MARL algorithms.}
+\caption{Ablation training reward curves: adaptive blending with MARL methods and the warm-up variant
+(150k-step scale freeze).}
 \label{fig:alpha_ablation}
 \end{figure}
 
@@ -1026,6 +1558,38 @@ PPO + HAPPO & 92$\pm$0.2 & 87$\pm$0.4 & 94.60$\pm$0.5\\
 \label{tab:seed_robustness}
 \end{table}
 
+GPC was trained under three independent seeds (42, 100, 200), each evaluated with the protocol used for
+all other methods (Table~\ref{tab:seed_robustness}). Across seeds, GPC attains 95.92$\pm$0.58\% reach,
+93.86$\pm$1.07\% alignment, and 97.86$\pm$0.53\% relative success. The across-seed deviation exceeds
+the within-seed evaluation deviation on every metric (1.07\% against 0.42--0.49\% on alignment),
+isolating initialization as a small but measurable variance component. Relative success varies least,
+by 0.95\% against 1.14\% and 2.04\% for reach and alignment, localizing seed sensitivity to the
+approach phase and indicating that the learned coordination behaviour is near
+initialization-invariant. The 6.9-point alignment margin over PPO+HAPPO (adaptive) spans
+approximately six across-seed deviations and is therefore not attributable to seed variation.
+
+To isolate whether this margin reflects the \emph{learned} value of $\alpha_t^i$, or is merely a
+consequence of the seventh output dimension enlarging the action space and altering training
+dynamics, an $\alpha$-detached control was trained. Architecture, hyperparameters, and training
+budget are identical to PPO+MAPPO (adaptive), with a gradient mask applied at the output layer and
+$\log\sigma$ parameters corresponding to dimension 6. Under this mask, $\alpha_t^i$ continues to be
+emitted per state and to enter the blend, the log-probability, the importance ratio, and the KL term
+used by the learning-rate scheduler, but it never receives an update from the task objective. Trained
+under the same three seeds and evaluated with the identical protocol, the detached control attains
+81.67$\pm$0.18\% reach, 59.62$\pm$9.69\% alignment, and 73.03$\pm$12.02\% relative success, a
+34.2-point alignment deficit against the adaptive variant. Reach success is comparable to the
+fixed-ratio baselines (Table~\ref{tab:alpha_baseline}) and shows seed variance on par with the
+adaptive method (0.18\% against 0.58\%), consistent with the frozen prior alone driving single-arm
+approach regardless of the gating head's training status. Alignment success, by contrast, exhibits a
+9.69\% across-seed deviation, roughly nine times the adaptive variant's 1.07\%, indicating that
+whether the untrained head's fixed random projection happens to route the blend favourably during the
+coordination phase is left to initialization rather than resolved by learning. This asymmetry, tight
+reach variance paired with wide alignment variance, localizes the cost of an untrained $\alpha_t^i$
+to the phase requiring active suppression of the prior. It is itself evidence against the
+extra-capacity explanation: were the gain attributable to the added output dimension independent of
+its training, the detached control would be expected to track the adaptive variant's stability on
+both metrics, rather than diverge sharply on one.
+
 % \begin{table}[htbp]
 % \centering
 % \caption{Ablation study over 10 trials across 4096 parallel environments (mean $\pm$
@@ -1047,18 +1611,21 @@ PPO + HAPPO & 92$\pm$0.2 & 87$\pm$0.4 & 94.60$\pm$0.5\\
 % \end{table}
 
 Table~\ref{tab:alpha_ablation} and Figure~\ref{fig:alpha_ablation} isolate the individual
-contributions of adaptive blending, centralized training, and the warm-up curriculum. ALPHA achieves
+contributions of adaptive blending, centralized training, and the warm-up curriculum. GPC achieves
 the highest performance across every metric (96.5\% reach, 95.0\% alignment, 98.45\% relative
 success), confirming that adaptive $\alpha_t^i$ combined with CTDE is the strongest configuration.
 Replacing MAPPO with IPPO under the identical adaptive blending mechanism drops alignment to 62.5\%,
 directly isolating the centralized critic's contribution: without global state access during
 training, the decentralized coordination policy cannot learn the precise bilateral coordination
-alignment convergence requires. PPO-HAPPO reaches 92\% and 87\%, confirming that adaptive blending
-partially compensates for the absence of a fully centralized critic, though the residual 8\%
-alignment gap to ALPHA persists since HAPPO's factored advantage estimates cannot fully substitute
-for genuinely global bilateral state. The warm-up variant, which freezes $\alpha_t^i$ at zero for the
+alignment convergence requires. PPO-HAPPO (adaptive) reaches 92\% and 87\% with stable reward
+convergence. HAPPO and MAPPO condition their critics on the identical 92-D global state and differ
+only in the actor update: HAPPO updates the agents sequentially, reweighting the second agent's
+advantage by the importance ratio of the first, whereas MAPPO updates both simultaneously. The
+residual 8-point alignment gap at this seed therefore isolates the cost of sequential factored
+updates in a task demanding simultaneous bilateral convergence, rather than any difference in critic
+observability. The warm-up variant, which freezes $\alpha_t^i$ at zero for the
 first 150k timesteps before enabling adaptive blending, reaches 85.8\% alignment, underperforming
-ALPHA by $\approx 9$ points despite eventually reaching the same adaptive mechanism, its reward curve
+GPC by $\approx 9$ points despite eventually reaching the same adaptive mechanism, its reward curve
 in Figure~\ref{fig:alpha_ablation} shows a pronounced dip and delayed recovery around the transition
 point, indicating that introducing blending abruptly after a pure-MAPPO warm-up disrupts an already
 established policy in a way that co-adapting from timestep zero avoids.
@@ -1076,13 +1643,46 @@ Figure~\ref{fig:alpha_evolution} shows $\alpha_t^i$ evolving across a single epi
 During approach, every method rapidly saturates $\alpha_t^i$ toward 0.8, confirming the policy
 learns to defer maximally to the frozen prior for single-arm reaching; at the phase transition,
 every method shows a pronounced reduction in $\alpha_t^i$, actively suppressing prior reliance
-exactly when cooperative alignment demands coordinated deviation from independent reaching, which is
-the direct empirical justification for adaptive rather than fixed blending, since any fixed
-$\alpha_t^i$ would retain inappropriate prior dominance precisely at this transition. ALPHA shows
-the shallowest and shortest dip on both arms of any method, recovering fastest due to the centralized
-critic's global coordination signal, while PPO-IPPO's dip is deeper and oscillatory, consistent with
-its decentralized critic being unable to resolve coupled bilateral alignment without global state
-access.
+exactly when cooperative alignment demands coordinated deviation from independent reaching. The
+$\alpha$-detached control reproduces a comparable dip at the same transition, because a fixed linear
+readout of a continuously trained trunk responds to the abrupt change in observation statistics
+regardless of whether that readout was ever optimized; the dip's presence alone is therefore not
+sufficient evidence of learned suppression. Across its three training seeds, the detached control's
+post-transition trajectory is inconsistent: seeds 42 and 200 settle into a wide, noisy band
+(approximately 0.65--0.75) that does not return to the adaptive plateau, while seed 100 recovers to a
+trajectory visually similar to the trained variants. This last case dissociates trajectory shape from
+task outcome: despite an $\alpha_t^i$ profile resembling the adaptive method, seed 100 attains only
+59.78\% alignment success against the adaptive variant's 93.86\% (Table~\ref{tab:seed_robustness}), a
+34-point deficit. Reaching a plausible $\alpha_t^i$ value is therefore not sufficient for coordinated
+task success. Under the detached control, the trunk continues training on dimensions 0--5 while
+dimension 6 remains a fixed random readout of that evolving representation, so any resemblance to the
+adaptive trajectory arises without the gating update and the coordination update ever being shaped by
+the same gradient. This co-adaptation, not the specific value $\alpha_t^i$ settles at, is the
+empirical basis for the adaptive blending mechanism: an untrained gating head, whether or not its
+trajectory happens to resemble the trained one, leaves the coordination policy without a blending
+signal that has been optimized jointly with it.
+
+The asymmetric dip depth and recovery timing between the left and right arms across all methods
+reflects the structural asymmetry in their observation spaces. The left arm observes its own errors in
+its own frame while receiving the right arm's errors transformed into the left frame, and vice versa
+for the right arm, producing distinct error magnitudes and gradient signals at the phase transition
+even under identical task conditions. This per-agent asymmetry is a direct consequence of the
+decentralized execution structure under CTDE, where each actor conditions on a locally framed 47-D
+observation rather than a 92-D shared global representation. GPC shows the shallowest and shortest dip
+on both arms, recovering fastest due to the centralized critic's global coordination signal, while
+PPO+IPPO exhibits a deeper, oscillatory dip, since decentralized critics cannot resolve the coupled
+bilateral alignment without global state access. Warm-up MAPPO shows a prolonged depression with
+delayed right-arm recovery, consistent with the reward instability in Figure~\ref{fig:alpha_ablation}:
+abrupt blending introduction after the 150k freeze disrupts co-adapted gating and coordination
+behaviours, and the right arm recovers more slowly due to its geometrically distinct workspace
+position relative to the alignment convergence point. PPO+HAPPO exhibits the deepest dip across both
+arms at the phase transition. The $\alpha$-detached control's post-transition behaviour is
+seed-dependent rather than consistently unresolved, yet its alignment success remains far below the
+adaptive variant on every seed, including the one whose trajectory most resembles it. This
+dissociation between trajectory appearance and task outcome, together with the 9.69\% across-seed
+deviation on alignment success against 1.07\% for the adaptive variant, indicates that an untrained
+gating head leaves alignment outcome dependent on initialization rather than on a policy jointly
+shaped with the coordination update.
 
 %% ------------------------------------------------------------
 \subsection{Hardware Validation}\label{subsec:alpha_hardware}
@@ -1091,22 +1691,24 @@ access.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/hardware_exp1_cylinder.jpg}
-\caption{Experiment 1: sequential execution of the dual-arm pick-and-pre-assembly alignment task for
-a cylindrical peg and hole on physical Kinova Gen3 Lite hardware.}
+\caption{Sequential real-hardware execution of dual-arm pick-and-pre-assembly alignment for the
+cylindrical peg-in-hole task on Kinova Gen3 Lite manipulators.}
 \label{fig:alpha_exp1}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/alpha/hardware_exp2_square.jpg}
-\caption{Experiment 2: sequential execution of the dual-arm pick-and-pre-assembly alignment task for a square peg and hole on physical Kinova Gen3 Lite hardware.}
+\caption{Sequential real-hardware execution of dual-arm pick-and-pre-assembly alignment for the
+square peg-in-hole task on Kinova Gen3 Lite manipulators.}
 \label{fig:alpha_exp2}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\linewidth]{Images/alpha/hardware_trajectories.jpg}
-\caption{End-effector trajectories of the dual-arm system during the two real-hardware experiments: (a) Experiment 1 and (b) Experiment 2.}
+\caption{End-effector Cartesian trajectories during real-hardware experiments: (a) cylindrical
+peg-in-hole and (b) square peg-in-hole.}
 \label{fig:alpha_hwtraj}
 \end{figure}
 
@@ -1131,9 +1733,14 @@ Successful execution            & \checkmark & \checkmark & 27 \\
 Object slipped during insertion & \checkmark & $\times$   & 1 \\
 Gripper fault during grasping   & $\times$   & $\times$   & 2 \\
 \midrule
-\textbf{Success rate} & \textbf{93.3\%} & \textbf{90.0\%} & \textbf{30} \\
+\textbf{Success rate} & \textbf{93.3\%} & \textbf{90.0\%}\textsuperscript{*} & \textbf{30} \\
 \bottomrule
 \end{tabular}
+
+\vspace{2pt}
+\footnotesize{\textit{Note*:}} \textit{Alignment success rate computed over all 30 trials. Relative
+alignment success over successful reach trials is 96.4\%. 95\% Wilson confidence intervals: Reach
+[78.7\%, 98.2\%], Alignment [74.4\%, 96.5\%].}
 \end{table}
 
 Table~\ref{tab:alpha_hwresults} reports 30 hardware trials with varied target positions: 27 complete
@@ -1145,6 +1752,140 @@ hardware deployment, this 90\% success confirms directly that the learned coordi
 that produces reliable bilateral alignment is encoded in the trained policy weights, not in the
 reward structure or snap mechanism used to train them, exactly the claim gap G7 required to be
 demonstrated rather than assumed.
+
+%% ------------------------------------------------------------
+\subsection{Discussion}\label{sec:alpha_discussion}
+%% ------------------------------------------------------------
+
+GPC hierarchically composes a frozen single-arm reaching prior with a MAPPO coordination policy
+through the adaptive gating scalar $\alpha_t^i$, allowing the blending mechanism and coordination
+policy to co-evolve from timestep zero. The centralized 92-D critic provides the bilateral
+coordination signal that neither fixed-blend variants nor decentralized IPPO critics can replicate.
+The reward-success decoupling at $\alpha_t^i = 0.9$ further demonstrates that dense reward
+accumulation is an unreliable proxy for cooperative task completion in hierarchical MARL, a finding
+with implications beyond this architecture.
+
+\paragraph{Hardware constraints.} The Kinova Gen3 Lite's non-spherical, force-sensorless gripper
+limits grasp verification to proximity thresholds; any in-hand slip propagates as an unobservable
+error into alignment. The min-operator bottleneck of Equation~\eqref{eq:alpha_approach} compensates for
+the restricted orientation space. Manipulators with integrated force sensing and spherical wrists
+would permit closed-loop grasp verification and compliant contact handling, with force observations
+appended directly to $\mathbf{s}^i_t$ and $S_t$.
+
+\paragraph{Prior dependence.} A poor prior is not structurally locked in: $\mathbf{m}_t^i$ is a free
+actor output, not a residual on $\mathbf{b}_t^i$, so MAPPO can counteract prior bias directly,
+independent of $\alpha_t^i$. The cap also favours the learned side, not the prior's: $\alpha_t^i \in
+[0,0.8]$ bounds the \emph{prior's} share, guarantees the coordination policy at least 20\% weight, and
+permits $\alpha_t^i = 0$ (Proposition~\ref{prop:boundeddeviation}). The real cost is narrower:
+cancelling a bad prior spends part of $\mathbf{m}_t^i$'s budget, and the rate limit keeps $\alpha_t^i$
+from reaching zero faster than $\approx$16 steps (Propositions~\ref{prop:ratelimit}
+and~\ref{prop:nonrestrictive}). The fixed $\alpha_t^i = 0.9$ baseline shows this failure mode directly:
+reach falls to 1.76\% and alignment to 0.02\% despite high reward (Table~\ref{tab:alpha_baseline}). No
+capacity-parity claim is made against an unconstrained MAPPO actor
+(Proposition~\ref{prop:boundeddeviation}), and whether this trade costs more on tasks demanding larger
+deviations remains untested.
+
+\paragraph{Perception and pose.} Object pose is assumed known a priori. The GPC policy consumes only
+proprioceptive observations, so a vision or pose-estimation module would make the system
+perception-complete without modifying the learned policy or reward structure. Object geometry is
+likewise not observed by the policy; evaluation on unseen peg and hole shapes or dimensions would
+require a perception or grasp-adaptation component outside the collaborative-alignment strategy
+proposed here, rather than a property of the coordination policy itself.
+
+\paragraph{Snap mechanism and sim-to-real.} The simulation snap mechanism is excluded from hardware
+deployment, replaced by staged spatial waypoints at 0.4\,m, 0.17\,m, and 0.1\,m separation, as detailed
+in Section~\ref{sec:alpha_sim2real}. The 90\% hardware alignment success with the snap fully replaced
+confirms that learned coordination is encoded in policy weights rather than reward structure. Although
+Isaac Lab provides contact force feedback, transferring contact observations to hardware would
+introduce observation distribution mismatch, further justifying the waypoint replacement.
+
+\paragraph{Scalability.} The underlying CTDE training scheme is architecturally agnostic to agent
+count. We hypothesize that extension to $N > 2$ arms would require expanding the global state
+dimensionality and adding agents to the MAPPO update, without structural changes to the blending
+mechanism or reward design. This remains untested, as all experiments in this work are confined to the
+dual-arm setting.
+
+\paragraph{Task transfer.} The architecture separates a task-general component from a task-specific
+one. The frozen single-arm reaching prior, the blending mechanism
+(Equations~\eqref{eq:alpha_increment}--\eqref{eq:alpha_combined}), and the two-phase task template,
+independent approach followed by a coordination phase, are not specific to peg-in-hole alignment.
+Other cooperative dual-arm tasks share this coarse structure: object handover and rigid-object
+transport both begin with each arm reaching an individual configuration before a coordination phase is
+required. What is task-specific is the reward design
+(Equations~\eqref{eq:alpha_approach}--\eqref{eq:alpha_totalreward}) and the snap mechanism
+(Section~\ref{sec:alpha_reward}), both built around a \emph{terminal} co-axial matching objective:
+the alignment reward and its success bonus reward convergence to a target relative pose once, not a
+constraint sustained thereafter. Joint transport of a rigid beam instead demands that the relative
+pose be held throughout the transport trajectory, a continuously enforced constraint rather than a
+terminal target. Reusing the current reward would require reformulating the alignment term as a
+running penalty rather than a one-time convergence bonus. Object handover introduces a further
+structural difference: an asymmetric giver/receiver role and an event-triggered contact/release
+action. This breaks the agent-symmetry assumption (Section~\ref{sec:alpha_formulation}) that motivated
+MAPPO's simultaneous update over HAPPO's sequential one for the present task, and would need to be
+reconsidered for an asymmetric-role formulation. We therefore expect the coordination \emph{template},
+phased approach followed by a blended coordination policy under a shared critic, to transfer across
+this class of dual-arm tasks, whereas the reward shaping, the phase-transition triggers, and, for
+asymmetric-role tasks, the underlying MARL update scheme would need to be re-derived per task. No
+retraining-free transfer guarantee is claimed or evaluated in this work.
+
+%% ------------------------------------------------------------
+\subsection{Limitations of Part II}\label{sec:alpha_limitations}
+%% ------------------------------------------------------------
+
+The task evaluated here is a simplified instance of pre-assembly alignment. The results characterize
+coordination learning under the conditions listed below and do not establish performance under
+contact-rich, perception-driven, or geometrically varied conditions.
+
+\begin{itemize}
+\item \textbf{Known object pose.} Target poses are supplied to the policy rather than estimated; no
+visual or pose-estimation module is included in the pipeline.
+\item \textbf{No contact or force sensing.} Grasp success is verified by proximity threshold alone.
+In-hand slip is unobservable to the policy and propagates into the alignment phase as an uncorrected
+error.
+\item \textbf{Scripted grasping.} Gripper actuation is position-controlled and triggered by proximity
+thresholds; grasp synthesis is not learned and is outside the scope of the coordination problem
+studied.
+\item \textbf{Two geometries at fixed dimensions.} Evaluation covers square and cylindrical
+peg-in-hole configurations at fixed peg and hole dimensions. Transfer to unseen geometries,
+dimensions, or clearances without retraining has not been evaluated.
+\item \textbf{Single coordination task class.} The framework is evaluated only on terminal co-axial
+alignment. Transfer to sustained-constraint tasks, such as rigid-object transport, or asymmetric-role
+tasks, such as handover, is discussed in Section~\ref{sec:alpha_discussion} but not evaluated, and
+would require reward redesign and, for asymmetric roles, reconsidering the choice of MARL update
+scheme.
+\item \textbf{Training-time snap mechanism.} Fine alignment is stabilized during training by a snap
+mechanism that fixes a geometric midpoint sub-goal. It is removed at deployment and replaced by the
+waypoint state machine of Section~\ref{sec:alpha_sim2real}, so hardware results are obtained without
+it.
+\item \textbf{Baseline hyperparameters matched rather than tuned per method.} All baselines share the
+configuration of Table~\ref{tab:alpha_hyper}, as is common practice in recent MARL benchmarking, which
+typically employs per-algorithm, per-task hyperparameter search~\citep{xie2026multi}. This avoids
+favouring any single method through selective tuning, but the reported baseline performance may not
+reflect each algorithm's individually optimal configuration; the training cost per run made an
+independent per-algorithm search infeasible within the scope of this work.
+\item \textbf{Asymmetric seeding.} The proposed method and the $\alpha$-detached control are each
+reported over three training seeds (Table~\ref{tab:seed_robustness}); all other baselines and ablation
+variants are trained under a single seed (42). Cross-method differences are therefore reported
+descriptively, in multiples of the observed across-seed deviation, rather than through statistical
+tests between methods.
+\item \textbf{Comparison scope.} The framework is benchmarked exclusively against learning-based
+(MARL) baselines, matching the contribution of a learned coordination strategy rather than a
+control-engineering study. Implementing and tuning classical controllers (impedance, MPC, trajectory
+optimization) to a comparable standard for this task is a separate undertaking, and no performance
+claim relative to classical dual-arm control is made.
+\end{itemize}
+
+In summary, GPC composes a frozen single-arm reaching prior with a MAPPO coordination policy through
+a learned adaptive gating scalar output as a seventh action dimension. Joint training of
+coordination and gating from timestep zero under CTDE with a 92-D global critic achieves 95.9\%
+reach and 93.9\% alignment (mean over three training seeds) across 4096 parallel simulation
+environments, significantly outperforming pure MAPPO (8.3\%), pure IPPO (25.0\%), HAPPO (32.3\%), all
+fixed-blend variants, and the warm-up curriculum. Direct sim-to-real transfer on dual Kinova Gen3 Lite
+manipulators, with 200\,Hz policy inference at ten times the 20\,Hz hardware control loop on a
+CPU-only platform, demonstrates successful square and cylindrical peg-in-hole alignment. Future work
+will integrate force sensing for compliant contact handling, visual perception for object pose
+estimation, extension to $N > 2$ arm configurations, and evaluation on other cooperative task classes
+such as object handover and rigid-object transport.
 
 The two studies in this chapter close the thesis's progression from single-arm classical vision to
 dual-arm reinforcement learning: Part I produces a trajectory-tracking controller for a single

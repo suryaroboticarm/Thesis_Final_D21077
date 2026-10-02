@@ -415,7 +415,7 @@ generalize to continuous trajectory tracking at deployment~\citep{sk2025diktrack
 The seventh study presents an end-to-end PPO-based differential inverse kinematics controller that
 directly maps instantaneous Cartesian pose errors to joint velocity commands, bypassing any dependence on numerical solvers or explicit Jacobian
 computation. A novel coupled reward function combining a min-operator pose reward, asymmetric
-progress shaping, and an exponential energy penalty enforces simultaneous position-orientation
+progress shaping, and an exponential joint velocity penalty enforces simultaneous position-orientation
 convergence while producing smooth, hardware-safe velocity commands, and sim-to-real transfer is
 validated on physical Kinova Gen3 Lite hardware at 20\,Hz. A compact $256\times256$ actor-critic
 architecture, trained end-to-end on this coupled reward, learns a generalizable velocity-level
@@ -477,7 +477,7 @@ execution, and Centralized Learning, and by communication protocol, separating a
 explicitly share state or intent from those that must infer behaviour from observed actions. For
 dual-arm manipulation, the problem is most effectively formulated as a fully
 cooperative decentralized partially observable Markov Decision Process (Dec-POMDP) under the CTDE
-paradigm~\citep{yu2022surprising}. While recent heterogeneous-agent CTDE methods such as HATRPO and
+paradigm~\citep{yu2022surprising}. While recent heterogeneous-agent CTDE methods such as
 HAPPO offer monotonic improvement guarantees for asymmetric tasks via sequential policy
 updates~\citep{kuba2021trust}, the agents in a symmetric dual-arm system are structurally symmetric,
 each arm sharing identical architecture and observation dimensionality. In this homogeneous
@@ -505,8 +505,8 @@ blending mechanism and coordination strategy to co-evolve. The two-phase task st
 independent target reaching followed by cooperative alignment, is executed entirely under joint
 velocity control, with gripper actuation and phase transitions handled by proximity thresholds. The
 proposed framework is validated through direct sim-to-real transfer on physical Kinova Gen3 Lite
-manipulators via the Kortex API, achieving 96.5\% reach and 95.0\% alignment success in simulation
-and pick-and-pre-assembly alignment of square and cylindrical peg-in-hole configurations on hardware
+manipulators via the Kortex API, achieving 95.9\% reach and 93.9\% alignment success in simulation
+(mean over three training seeds) and pick-and-pre-assembly alignment of square and cylindrical peg-in-hole configurations on hardware
 at 20\,Hz, with a 200\,Hz policy inference rate on a CPU-only deployment
 platform~\citep{sk2025alpha}.
 
@@ -548,8 +548,8 @@ Table~\ref{tab:intro_results} collects the headline results.
 6 & Velocity improvement over fixed allocation & $\approx$47\% (homogeneous), zero collisions \\
 6 & Mixed-object overhead                     & $\approx$11\%, offset by superior safety margins \\
 7 & Zero-shot trajectory generalization       & Circle, square, lemniscate, 3-D Lissajous at 20\,Hz \\
-8 & Reach / alignment success (simulation)    & 96.5\% reach, 95.0\% alignment \\
-8 & Reach / alignment success (hardware)    & 96.5\% reach, 95.0\% alignment \\
+8 & Reach / alignment success (simulation, 3-seed mean) & 95.9\% reach, 93.9\% alignment \\
+8 & Reach / alignment success (hardware)    & 93.3\% reach, 90.0\% alignment \\
 \bottomrule
 \end{tabular}%
 }
@@ -664,7 +664,7 @@ The contributions of this thesis, in the order the studies are developed, are as
     improvement over fixed allocation with zero collisions~\citep{sk2025competitive}.
 
     \item[C7. Coupled-reward differential inverse kinematics.] A reward architecture combining
-    min-operator pose coupling, asymmetric progress shaping, and an exponential energy penalty that
+    min-operator pose coupling, asymmetric progress shaping, and an exponential joint velocity penalty that
     resolves simultaneous position-orientation convergence without staged curricula, generalizing
     zero-shot from static pose reaching to four continuous trajectory
     geometries~\citep{sk2025diktracking}.
@@ -672,7 +672,7 @@ The contributions of this thesis, in the order the studies are developed, are as
     \item[C8. Prior guided policy learning.] A learned gating scalar, emitted as a
     seventh action dimension, that interpolates between a frozen single-arm PPO prior and a MAPPO
     coordination correction at every timestep and co-evolves with the coordination policy from
-    timestep zero. 96.5\% reach and 95.0\% alignment success in simulation with sim-to-real transfer
+    timestep zero. 95.9\% reach and 93.9\% alignment success in simulation (three-seed mean) with sim-to-real transfer
     on a CPU-only platform~\citep{sk2025alpha}.
 \end{description}
 

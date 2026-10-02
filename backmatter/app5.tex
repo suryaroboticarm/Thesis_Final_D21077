@@ -8,7 +8,7 @@ and~\eqref{eq:dikppo_ppoloss}), and its second study further extends them to a c
 decentralized-actor setting (Equations~\eqref{eq:alpha_gae}--\eqref{eq:alpha_totalloss}), all cited
 to~\citep{schulman2017proximal,yu2022surprising} rather than derived. This appendix derives GAE from
 its underlying $k$-step estimators, motivates the clipped objective as a pessimistic bound on the
-unclipped surrogate, and extends both to the centralized critic used in ALPHA.
+unclipped surrogate, and extends both to the centralized critic used in GPC.
 
 %% ============================================================
 \section{The \texorpdfstring{$k$}{k}-Step Advantage Estimator}\label{sec:appE_kstep}
@@ -100,7 +100,7 @@ update as the explicit KL constraint without requiring it to be solved at every 
 %% ============================================================
 
 The Multi-Agent PPO objective of Equations~\eqref{eq:alpha_gae}--\eqref{eq:alpha_totalloss} used for
-ALPHA's coordination policy replaces every occurrence of the single-agent state $s_t$ used as the
+GPC's coordination policy replaces every occurrence of the single-agent state $s_t$ used as the
 critic's argument above with the shared global state $S_t \in \mathbb{R}^{92}$, while leaving the
 actor's argument as each agent's own local observation $\mathbf{s}_t^i \in \mathbb{R}^{47}$. The
 $k$-step telescoping argument of Section~\ref{sec:appE_kstep} and the exponential-weighting argument

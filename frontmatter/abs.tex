@@ -41,13 +41,13 @@ controller maps instantaneous Cartesian pose error directly to joint velocity co
 Kinova Gen3 Lite's non-spherical wrist, whose offset joint axes break the kinematic decoupling
 closed-form inverse kinematics depends on; trained purely on 1.5 million static reachable poses with
 no trajectory supervision, it generalizes zero-shot to circular, square, lemniscate, and 3-D
-Lissajous trajectories on physical hardware, and is the only method among five classical and
-learned baselines that does not degrade from simulation to hardware. That trained policy is then
-reused, frozen, as the single-arm prior inside \textbf{ALPHA}, an adaptive hierarchical blending
+Lissajous trajectories on physical hardware, and, on the circle, is the only method among the
+four deployed whose position error did not increase from simulation to hardware. That trained policy is then
+reused, frozen, as the single-arm prior inside \textbf{GPC} (Gated Prior Composition), a hierarchical
 architecture in which a Multi-Agent PPO coordination policy, trained under Centralized Training
 with Decentralized Execution, is combined with the frozen prior through a learned, incrementally
-updated gating scalar co-trained with it from timestep zero, achieving 96.5\% reach and 95.0\%
-alignment success across 4096 parallel simulation environments and 93.3\% reach with 90.0\%
+updated gating scalar co-trained with it from timestep zero, achieving 95.9\% reach and 93.9\%
+alignment success (mean over three training seeds) across 4096 parallel simulation environments and 93.3\% reach with 90.0\%
 alignment success over 30 physical hardware trials of cooperative peg-in-hole pre-assembly
 alignment, with policy inference at 200\,Hz on a CPU-only platform against the hardware's 20\,Hz
 control loop.

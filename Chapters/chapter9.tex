@@ -187,15 +187,17 @@ rather than from any assessment introduced in this chapter.
     controller that maps instantaneous Cartesian pose error directly to joint velocity commands for
     the Kinova Gen3 Lite's non-spherical wrist, trained purely on 1.5 million static reachable poses
     with no trajectory supervision, generalizing zero-shot to circular, square, lemniscate, and 3-D
-    Lissajous trajectories on physical hardware, and the only method among five classical and learned
-    baselines that does not degrade from simulation to hardware~\citep{sk2025diktracking}.
+    Lissajous trajectories on physical hardware, and, on the circle, the only method among the four
+    deployed whose position error did not increase from simulation to hardware~\citep{sk2025diktracking}.
 
     \item[Limitations.] The study states that hardware validation is restricted to a single
     manipulator, the Kinova Gen3 Lite, so generalization to other non-spherical-wrist platforms such
     as KUKA, ABB, or UR variants with offset wrist axes is untested and the cost of porting the
-    policy to a different kinematic structure is unknown; that the policy was trained with a single
-    random seed, so the variance of the approach across independent training runs has not been
-    characterized; that hardware baseline comparison against TRAC-IK, DLS, and SAC was restricted to
+    policy to a different kinematic structure is unknown; that the TRPO-D and SAC-S baselines and the
+    reward-ablation variants were trained with a single seed, and all physical experiments are
+    single-trial executions, so hardware run-to-run variance is uncharacterized; that the speed
+    evaluation is restricted to simulation and the empirical evaluation to four trajectory
+    geometries at a single spatial scale; that hardware baseline comparison against TRAC-IK, DLS, and SAC-S was restricted to
     the circular trajectory, while the proposed method was further validated on the lemniscate,
     3-D Lissajous, and square trajectories without retraining, leaving a head-to-head hardware
     comparison on the more complex trajectories open; that controller behaviour near kinematic
@@ -206,8 +208,9 @@ rather than from any assessment introduced in this chapter.
 
     \item[Future directions.] The study identifies incorporating singularity-proximal configurations
     during rollout collection to enable verified recovery behaviour at kinematic boundaries;
-    multi-seed training to quantify the variance of the proposed reward structure's accuracy and
-    smoothness advantages; extending the hardware baseline comparison to the non-circular
+    multi-seed training of the TRPO-D and SAC-S baselines and the ablation variants; adding a reference
+    velocity or waypoint preview to the observation; domain randomization and an external safety
+    layer; extending the hardware baseline comparison to the non-circular
     trajectories; and validating on additional non-spherical-wrist manipulators to test whether the
     consistency observed here is specific to the Kinova Gen3 Lite or a more general property of the
     reward design. It further identifies extending the framework to dual-arm manipulation, where the
@@ -215,7 +218,7 @@ rather than from any assessment introduced in this chapter.
     coordinated bi-manual control, as a natural extension toward collaborative assembly operations
     requiring simultaneous precise trajectory tracking under contact
     constraints~\citep{sk2025diktracking}. The eighth study of this thesis takes up exactly this
-    direction, reusing the trained policy, frozen, as the single-arm prior inside ALPHA.
+    direction, reusing the trained policy, frozen, as the single-arm prior inside GPC.
 \end{description}
 
 %% ------------------------------------------------------------
@@ -224,11 +227,11 @@ rather than from any assessment introduced in this chapter.
 
 \begin{description}
     \item[Contribution.] The eighth study reuses the seventh study's trained policy, frozen, as the
-    single-arm prior inside ALPHA, an adaptive hierarchical blending architecture in which a
+    single-arm prior inside GPC (Gated Prior Composition), a hierarchical architecture in which a
     Multi-Agent PPO coordination policy, trained under Centralized Training with Decentralized
     Execution, is combined with the frozen prior through a learned, incrementally updated gating
-    scalar co-trained with it from timestep zero, achieving 96.5\% reach and 95.0\% alignment success
-    across 4096 parallel simulation environments and 93.3\% reach with 90.0\% alignment success over
+    scalar co-trained with it from timestep zero, achieving 95.9\% reach and 93.9\% alignment success
+    (mean over three training seeds) across 4096 parallel simulation environments and 93.3\% reach with 90.0\% alignment success over
     30 physical hardware trials of cooperative peg-in-hole pre-assembly alignment, with policy
     inference at 200\,Hz on a CPU-only platform against the hardware's 20\,Hz control
     loop~\citep{sk2025alpha}.
@@ -263,7 +266,7 @@ rather than from any assessment introduced in this chapter.
 Read together, the future directions identified independently across these eight studies converge
 on a small number of recurring themes rather than eight unrelated wish-lists. Perception
 completeness recurs three times: the first study's own call to integrate with a dual-arm system, the
-second study's call to handle occluded and moving objects, and the eighth study's call to give ALPHA
+second study's call to handle occluded and moving objects, and the eighth study's call to give GPC
 a vision front-end so that object pose is sensed rather than assumed, are each, in the terms their
 own authors used, instances of the same unfinished step. External-obstacle awareness recurs twice,
 in the fourth study's assumption of an obstacle-free shared workspace and the fifth study's identical
