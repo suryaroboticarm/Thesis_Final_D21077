@@ -499,10 +499,10 @@ rather than any added cost per deployment.
 \textbf{Method} & \textbf{Total timesteps} & \textbf{Wall-clock time} \\
 \midrule
 PPO-D (proposed)~\citep{schulman2017proximal} & $\approx 5\times10^{8}$   & 1\,h 05\,m 35\,s \\
-PPO-S            & $\approx 3.5\times10^{8}$ & 38\,m 52\,s \\
-TRPO-D           & $\approx 5\times10^{8}$   & 3\,h 14\,m 36\,s \\
-SAC-D            & $\approx 9\times10^{8}$   & 2\,h 52\,m 34\,s \\
-SAC-S            & $\approx 4\times10^{8}$   & 1\,h 24\,m 01\,s \\
+PPO-S~\citep{schulman2017proximal}  & $\approx 3.5\times10^{8}$ & 38\,m 52\,s \\
+TRPO-D~\citep{schulman2015trust} & $\approx 5\times10^{8}$   & 3\,h 14\,m 36\,s \\
+SAC-D~\citep{haarnoja2018soft} & $\approx 9\times10^{8}$   & 2\,h 52\,m 34\,s \\
+SAC-S~\citep{haarnoja2018soft} & $\approx 4\times10^{8}$   & 1\,h 24\,m 01\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -714,15 +714,15 @@ bold~\citep{sk2025diktracking}.}
                           & Lemniscate & 0.013254 & 0.003857 & 0.0294 \\
                           & Lissajous & 0.035303 & 0.008647 & 0.0164 \\
 \midrule
-\multirow{3}{*}{TRPO-D}  & Circle & 0.089448 & 0.372891 & 2.92 \\
+\multirow{3}{*}{TRPO-D~\citep{schulman2015trust}}  & Circle & 0.089448 & 0.372891 & 2.92 \\
                           & Lemniscate & 0.130428 & 0.383532 & 0.141 \\
                           & Lissajous & 0.122329 & 0.257595 & 0.815 \\
 \midrule
-\multirow{3}{*}{SAC-S}   & Circle & 0.029320 & 0.051513 & 19.78 \\
+\multirow{3}{*}{SAC-S~\citep{haarnoja2018soft}}   & Circle & 0.029320 & 0.051513 & 19.78 \\
                           & Lemniscate & 0.030142 & 0.051104 & 19.08 \\
                           & Lissajous & 0.029181 & 0.050908 & 18.85 \\
 \midrule
-\multirow{3}{*}{\textbf{PPO-D}} & Circle & 0.009951 & 0.026476 & \textbf{0.0055} \\
+\multirow{3}{*}{\textbf{PPO-D}~\citep{schulman2017proximal}} & Circle & 0.009951 & 0.026476 & \textbf{0.0055} \\
                           & Lemniscate & 0.010650 & 0.023536 & 0.0107 \\
                           & Lissajous & 0.016667 & 0.043686 & 0.0147 \\
 \bottomrule
@@ -867,9 +867,9 @@ bold~\citep{sk2025diktracking}.}
 \midrule
 TRAC-IK~\citep{beeson2015trac} & Circle & 0.0362 & 0.0770 \\
 DLS~\citep{chiaverini1994review}     & Circle & 0.0490 & \textbf{0.0021} \\
-SAC-S   & Circle & 0.0450 & 0.0590 \\
+SAC-S~\citep{haarnoja2018soft}   & Circle & 0.0450 & 0.0590 \\
 \midrule
-\multirow{4}{*}{PPO-D} & Circle & \textbf{0.0063} & 0.0320 \\
+\multirow{4}{*}{PPO-D~\citep{schulman2017proximal}} & Circle & \textbf{0.0063} & 0.0320 \\
                         & Square & 0.0079 & 0.0334 \\
                         & Lemniscate & 0.0124 & 0.0212 \\
                         & Lissajous & 0.0154 & 0.0410 \\
