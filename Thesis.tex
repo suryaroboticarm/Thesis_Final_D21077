@@ -107,7 +107,7 @@
 \renewcommand{\headrulewidth}{1pt}
 \renewcommand{\footrulewidth}{1pt}
 \graphicspath{{graphics/}}
-\hypersetup{colorlinks=true, citecolor=blue!80!black}
+\hypersetup{colorlinks=true, citecolor=blue!80!black, linkcolor=blue!80!black}
 \newcommand{\citeauth}[1]{\hyperlink{cite.#1}{\citeauthor{#1}}~[\citeyear{#1}]}
 
 %% ============================================================
@@ -141,9 +141,11 @@
 \include{frontmatter/abs}        % Abstract
 
 \begin{contentlist}              % Tables of contents
+\hypersetup{linkcolor=black}     % black entries in the contents and lists
 \tableofcontents                 % Table of contents
 \listoffigures                   % List of figures
 \listoftables                    % List of tables
+\hypersetup{linkcolor=blue!80!black} % dark blue for cross-references in the body
 \end{contentlist}
 
 \include{frontmatter/acronyms}   % List of Acronyms
