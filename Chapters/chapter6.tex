@@ -77,7 +77,7 @@ manipulation~\citep{surya2025iapf}.}
 \textbf{Method} & \textbf{Force components} & \textbf{Stability guarantee} & \textbf{Real-time} & \textbf{Key limitation} \\
 \midrule
 Traditional APF~\citep{khatib1986real} & Attractive + repulsive & None & Moderate & Local minima in clutter \\
-Enhanced APF (sampling-based) & Attractive + repulsive + sampling & Statistical ($95.2\%$) & Slow ($9.14$\,s) & High computational overhead \\
+Enhanced APF~\citep{byrne2015improved}  & Attractive + repulsive + sampling & Statistical ($95.2\%$) & Slow ($9.14$\,s) & High computational overhead \\
 D-APF (UAV navigation)~\citep{jayaweera2020dapf} & Exponential + vertical priority & None & Moderate & Limited to UAV applications \\
 Rotating APF~\citep{lin2025robot} & Attractive + rotating repulsive & Mathematical & Moderate & Single arm only, no coordination \\
 \textbf{iAPF (proposed)} & Attractive + repulsive + home-seeking & \textbf{Empirically validated} & \textbf{Fast (10\,Hz)} & Dynamic obstacle adaptation \\
@@ -88,7 +88,7 @@ Rotating APF~\citep{lin2025robot} & Attractive + rotating repulsive & Mathematic
 
 Object perception uses YOLOv8 with oriented bounding boxes (OBB)~\citep{yolov8}, selected over
 instance-segmentation alternatives after a direct comparison on the same custom dataset,
-Table~\ref{tab:iapf_modelcompare}: Detectron2 and the YOLO instance-segmentation variants all incur
+Table~\ref{tab:iapf_modelcompare}: Detectron2~\cite{wu2019detectron2} and the YOLOv8 instance-segmentation~\citep{yolov8} variants all incur
 either a substantially larger model or slower inference than the OBB detector, for a task, oriented
 fastener localization, that does not require a per-pixel segmentation mask.
 
@@ -96,16 +96,17 @@ fastener localization, that does not require a per-pixel segmentation mask.
 \centering
 \caption{Model comparison for object detection on the custom nut/bolt dataset~\citep{surya2025iapf}.}
 \label{tab:iapf_modelcompare}
+\resizebox{\textwidth}{!}{
 \begin{tabular}{lcc}
 \toprule
 \textbf{Model} & \textbf{Model size (MB)} & \textbf{Inference (relative)} \\
 \midrule
-Detectron2 instance segmentation & 351.1 & 0.51 \\
+Detectron2 instance segmentation~\cite{wu2019detectron2} & 351.1 & 0.51 \\
 YOLOv8 instance segmentation~\citep{yolov8}     & 20.0  & 15 \\
-YOLOv11 instance segmentation    & 6.0   & 13 \\
+YOLOv11 instance segmentation~\citep{khanam2024yolov11}    & 6.0   & 13 \\
 \textbf{YOLOv8 OBB}~\citep{yolov8}              & \textbf{5.9} & \textbf{20} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 The custom dataset, 1230 images split 1120/80/30 into training, validation, and test sets and
